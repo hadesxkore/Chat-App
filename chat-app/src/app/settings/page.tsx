@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { FormLabel } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from 'next-themes';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -73,7 +73,7 @@ export default function SettingsPage() {
                   className="w-20 h-20 rounded-full"
                 />
                 <div className="flex-1 space-y-2">
-                  <Label htmlFor="displayName">Display Name</Label>
+                  <FormLabel htmlFor="displayName">Display Name</FormLabel>
                   <Input
                     id="displayName"
                     value={displayName}
@@ -83,7 +83,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <FormLabel htmlFor="email">Email</FormLabel>
                 <Input
                   id="email"
                   type="email"
@@ -98,7 +98,7 @@ export default function SettingsPage() {
               <h3 className="text-lg font-medium">Preferences</h3>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
+                  <FormLabel>Dark Mode</FormLabel>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Toggle dark mode theme
                   </p>

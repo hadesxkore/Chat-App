@@ -26,10 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CloudinaryUploadButton from "@/components/CloudinaryUploadButton";
 import FileUploader from "@/components/FileUploader";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormLabel } from "@/components/ui/label";
 
 interface User {
   id: string;
@@ -2665,7 +2667,7 @@ export default function ChatPage() {
             
             <div className="space-y-4">
               <div>
-                <Label htmlFor="displayName">Display Name</Label>
+                <FormLabel htmlFor="displayName">Display Name</FormLabel>
                 <Input
                   id="displayName"
                   value={editedDisplayName}
@@ -2676,7 +2678,7 @@ export default function ChatPage() {
               </div>
               
               <div>
-                <Label htmlFor="bio">Bio</Label>
+                <FormLabel htmlFor="bio">Bio</FormLabel>
                 <Input
                   id="bio"
                   value={editedBio}
@@ -2687,7 +2689,7 @@ export default function ChatPage() {
               </div>
               
               <div>
-                <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+                <FormLabel htmlFor="email" className="text-muted-foreground">Email</FormLabel>
                 <Input
                   id="email"
                   value={user?.email || ''}
@@ -2848,7 +2850,7 @@ export default function ChatPage() {
             </div>
             
                                     <div>
-              <Label htmlFor="nickname">Nickname</Label>
+              <FormLabel htmlFor="nickname">Nickname</FormLabel>
               <Input
                 id="nickname"
                 value={editedNickname}
