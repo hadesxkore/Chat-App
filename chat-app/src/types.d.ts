@@ -78,20 +78,6 @@ declare module '@/components/ui/label' {
   export const Label: React.FC<LabelProps>;
 }
 
-declare module '@/components/ui/button' {
-  // Remove these declarations since they're already defined in the actual button.tsx file
-  // This was causing the redeclaration error
-  /* 
-  export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    asChild?: boolean;
-    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-    size?: 'default' | 'sm' | 'lg' | 'icon';
-  }
-  
-  export const Button: React.FC<ButtonProps>;
-  */
-}
-
 declare module '@/components/ui/switch' {
   export interface SwitchProps {
     checked?: boolean;
