@@ -1776,32 +1776,47 @@ export default function ChatPage() {
       <div className="flex h-screen bg-background">
         {/* Mobile menu button - only visible on small screens */}
         <button
-          className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-full bg-primary text-primary-foreground"
+          className="fixed top-4 z-50 md:hidden p-2 rounded-full bg-primary text-primary-foreground shadow-md"
+          style={{ 
+            left: isSidebarOpen ? '16px' : '16px',
+            transition: 'left 0.3s ease-in-out'
+          }}
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
           <span className="sr-only">Toggle menu</span>
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
+            {isSidebarOpen ? (
+              // X icon when sidebar is open
+              <>
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </>
+            ) : (
+              // Hamburger icon when sidebar is closed
+              <>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </>
+            )}
           </svg>
         </button>
 
         {/* Sidebar - Make it responsive */}
         <div className={`
-          fixed inset-y-0 left-0 z-40 w-80 border-r border-border flex flex-col bg-card/30
+          fixed inset-y-0 left-0 z-40 w-80 border-r border-border flex flex-col bg-card
           transform transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:relative
         `}>
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-border">
+          <div className="p-4 pt-14 md:pt-4 border-b border-border">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-              <button
+                      <button
                         onClick={() => setProfileDialogOpen(true)}
                         className="relative rounded-full overflow-hidden border border-border hover:border-primary transition-colors"
                       >
@@ -1811,7 +1826,7 @@ export default function ChatPage() {
                             {user?.displayName?.[0]?.toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
-              </button>
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Click to edit profile</p>
@@ -1827,7 +1842,9 @@ export default function ChatPage() {
                   </Badge>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              
+              {/* Dark mode toggle moved inside the sidebar header */}
+              <div className="flex items-center">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1849,8 +1866,8 @@ export default function ChatPage() {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              </div>
             </div>
-          </div>
 
             <Tabs defaultValue="chats" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
