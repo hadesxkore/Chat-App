@@ -1775,7 +1775,7 @@ export default function ChatPage() {
     <>
       <div className="flex h-screen bg-background">
         {/* Mobile menu button - only visible on small screens */}
-              <button
+        <button
           className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-full bg-primary text-primary-foreground"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
@@ -1785,10 +1785,15 @@ export default function ChatPage() {
             <line x1="3" y1="6" x2="21" y2="6"></line>
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
-              </button>
+        </button>
 
-        {/* Sidebar */}
-        <div className={`w-80 border-r border-border flex flex-col bg-card/30`}>
+        {/* Sidebar - Make it responsive */}
+        <div className={`
+          fixed inset-y-0 left-0 z-40 w-80 border-r border-border flex flex-col bg-card/30
+          transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0 md:relative
+        `}>
           {/* Sidebar Header */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-4">
@@ -2085,13 +2090,22 @@ export default function ChatPage() {
         </div>
       </div>
 
-        {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {selectedUser ? (
-          <>
-            {/* Chat Header */}
+        {/* Main Chat Area - Make it responsive */}
+        <div className="flex-1 flex flex-col w-full">
+          {selectedUser ? (
+            <>
+              {/* Chat Header - Make it responsive */}
               <div className="p-4 border-b border-border bg-card/30 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
+                  {/* Show back button on mobile */}
+                  <button
+                    className="md:hidden mr-2"
+                    onClick={() => setSelectedUser(null)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                  </button>
                   <div className="relative">
                 <img
                   src={selectedUser.photoURL || '/default-avatar.png'}
@@ -2187,8 +2201,8 @@ export default function ChatPage() {
                 </div>
               </div>
               
-              {/* Message container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" id="message-container">
+              {/* Message container - Make it responsive */}
+              <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-4" id="message-container">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                     {selectedUser && blockedUsers.includes(selectedUser.id) ? (
@@ -2233,7 +2247,7 @@ export default function ChatPage() {
                             }}
                           >
                             <div
-                          className={`flex items-start space-x-2 max-w-[80%] ${
+                          className={`flex items-start space-x-2 max-w-[90%] sm:max-w-[80%] ${
                                 message.senderId === user?.uid
                               ? 'ml-auto flex-row-reverse space-x-reverse'
                               : 'mr-auto'
@@ -2398,7 +2412,7 @@ export default function ChatPage() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 10 }}
-                            className="flex items-start space-x-2 max-w-[80%]"
+                            className="flex items-start space-x-2 max-w-[90%] sm:max-w-[80%]"
                           >
                             <Avatar className="h-8 w-8">
                               <AvatarImage src={selectedUser?.photoURL || '/default-avatar.png'} />
@@ -2419,8 +2433,8 @@ export default function ChatPage() {
                     )}
                 </div>
 
-              {/* Message Input - Add conditional rendering for blocked status */}
-              <div className="p-4 border-t border-border">
+              {/* Message Input - Make it responsive */}
+              <div className="p-2 sm:p-4 border-t border-border">
                 {selectedUser && (
                   selectedUser.blockedUsers?.includes(user?.uid || '') ? (
                     <div className="p-3 text-center bg-destructive/10 rounded-lg text-destructive">
@@ -2431,7 +2445,7 @@ export default function ChatPage() {
                       You've blocked this user. Unblock to send messages.
                     </div>
                   ) : (
-                    <form onSubmit={handleSendMessage} className="flex space-x-3 items-center bg-background rounded-full shadow-sm border border-border p-1 pl-2">
+                    <form onSubmit={handleSendMessage} className="flex space-x-2 sm:space-x-3 items-center bg-background rounded-full shadow-sm border border-border p-1 pl-2">
                       <div className="flex space-x-1">
                         <div className="relative">
                           <Button
@@ -2543,7 +2557,7 @@ export default function ChatPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="max-w-md text-center"
+                className="max-w-md w-full text-center px-4"
               >
                 <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">
                   Welcome to Chat App
@@ -2616,8 +2630,8 @@ export default function ChatPage() {
 
       {/* Profile Dialog */}
       {profileDialogOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg shadow-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Your Profile</h2>
               <Button 
@@ -2719,8 +2733,8 @@ export default function ChatPage() {
 
       {/* User Profile Dialog */}
       {showUserProfile && selectedUser && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg shadow-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">User Profile</h2>
               <Button 
@@ -2823,8 +2837,8 @@ export default function ChatPage() {
 
       {/* Add Nickname Dialog */}
       {showEditNickname && selectedUser && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg shadow-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Edit Nickname</h2>
               <Button 
@@ -2900,10 +2914,10 @@ export default function ChatPage() {
       
       <Toaster richColors position="top-center" />
 
-      {/* Files & Photos Sheet */}
+      {/* Files & Photos Sheet - Make it responsive */}
       {showFilesPhotosSheet && selectedUser && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg shadow-lg p-6 w-full max-w-3xl h-[85vh] flex flex-col">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-3xl h-[85vh] flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Shared Content</h2>
               <Button 
@@ -3039,10 +3053,10 @@ export default function ChatPage() {
                                   </div>
                                 )}
 
-      {/* Image Preview Modal with Carousel */}
+      {/* Image Preview Modal - Make it responsive */}
       {imagePreviewUrl && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setImagePreviewUrl(null)}>
-          <div className="relative max-w-4xl max-h-[90vh] p-2">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="relative w-full max-w-4xl max-h-[90vh]">
             {/* Close button */}
                                     <Button
               variant="ghost" 
