@@ -67,27 +67,6 @@ declare module 'firebase/auth' {
   }
 }
 
-// Add shadcn/ui component types
-declare module '@/components/ui/label' {
-  export interface LabelProps {
-    htmlFor?: string;
-    children?: React.ReactNode;
-    className?: string;
-  }
-  
-  export const Label: React.FC<LabelProps>;
-}
-
-declare module '@/components/ui/switch' {
-  export interface SwitchProps {
-    checked?: boolean;
-    onCheckedChange?: (checked: boolean) => void;
-    className?: string;
-  }
-  
-  export const Switch: React.FC<SwitchProps>;
-}
-
 interface ImportMeta {
   env: {
     [key: string]: string;
