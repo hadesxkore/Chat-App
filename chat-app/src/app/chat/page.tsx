@@ -31,7 +31,7 @@ import CloudinaryUploadButton from "@/components/CloudinaryUploadButton";
 import FileUploader from "@/components/FileUploader";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import FormLabel from "@/components/ui/label";
+import { FormLabel } from "@/components/ui/label";
 
 interface User {
   id: string;

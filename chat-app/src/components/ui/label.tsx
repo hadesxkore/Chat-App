@@ -5,7 +5,7 @@ import * as LabelPrimitive from "@radix-ui/react-label"
 
 import { cn } from "@/lib/utils"
 
-const FormLabel = React.forwardRef<
+export const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => (
@@ -18,6 +18,4 @@ const FormLabel = React.forwardRef<
     {...props}
   />
 ))
-FormLabel.displayName = "FormLabel"
-
-export default FormLabel 
+FormLabel.displayName = "FormLabel" 
