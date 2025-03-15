@@ -13,6 +13,7 @@ import { Icons } from '@/components/icons';
 import { PhilosophicalQuote } from '@/components/PhilosophicalQuote';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { toast } from 'sonner';
+import { ContactWidget } from '@/components/ContactWidget';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -144,7 +145,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Auth form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-background relative">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -252,7 +253,26 @@ export default function LoginPage() {
             </CardFooter>
           </Card>
         </motion.div>
+
+        {/* Developer Information Footer - Repositioned */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="absolute bottom-4 right-4 text-right"
+        >
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text p-2 rounded-lg">
+            <h3 className="text-base font-bold text-transparent">Developed by</h3>
+            <p className="text-sm font-semibold text-transparent">Kobie Villanueva</p>
+            <p className="text-xs text-transparent opacity-75">4th Year College Student</p>
+            <p className="text-xs text-transparent opacity-75">BS Information Technology</p>
+            <p className="text-xs text-transparent opacity-75">Major in Web Application</p>
+          </div>
+        </motion.div>
       </div>
+
+      {/* Contact Widget */}
+      <ContactWidget />
     </div>
   );
 } 

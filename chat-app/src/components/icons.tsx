@@ -28,6 +28,9 @@ export const Icons = {
   sun: (props: IconProps) => <LucideIcons.Sun {...props} />,
   moon: (props: IconProps) => <LucideIcons.Moon {...props} />,
   refresh: (props: IconProps) => <LucideIcons.RefreshCw {...props} />,
+  messageCircle: (props: IconProps) => <LucideIcons.MessageCircle {...props} />,
+  chevronUp: (props: IconProps) => <LucideIcons.ChevronUp {...props} />,
+  chevronDown: (props: IconProps) => <LucideIcons.ChevronDown {...props} />,
   google: (props: IconProps) => (
     <svg
       aria-hidden="true"

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FormLabel } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Icons } from '@/components/icons';
+import { ContactWidget } from '@/components/ContactWidget';
 
 export default function SignUpPage() {
   const [email, setEmail] = useState('');
@@ -49,7 +50,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 relative">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -140,6 +141,25 @@ export default function SignUpPage() {
           </CardFooter>
         </Card>
       </motion.div>
+
+      {/* Developer Information Footer - Repositioned */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="absolute bottom-4 right-4 text-right"
+      >
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text p-2 rounded-lg">
+          <h3 className="text-base font-bold text-transparent">Developed by</h3>
+          <p className="text-sm font-semibold text-transparent">Kobie Villanueva</p>
+          <p className="text-xs text-transparent opacity-75">4th Year College Student</p>
+          <p className="text-xs text-transparent opacity-75">BS Information Technology</p>
+          <p className="text-xs text-transparent opacity-75">Major in Web Application</p>
+        </div>
+      </motion.div>
+
+      {/* Contact Widget */}
+      <ContactWidget />
     </div>
   );
 } 
