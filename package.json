@@ -11,6 +11,7 @@
     "start": "cd chat-app && npm run start"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "next": "^14.0.0"
   }
 }
