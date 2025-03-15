@@ -36,6 +36,7 @@ import { GroupChatComponent } from "@/components/GroupChat";
 import GroupMessages from "@/components/GroupMessages";
 import IncomingCallAlert from '@/components/IncomingCallAlert';
 import VideoCallButton from '@/components/VideoCallButton';
+import VideoCall from '@/components/VideoCall';
 
 interface User {
   id: string;
@@ -3162,6 +3163,27 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Video Call Dialog */}
+      {showVideoCall && selectedUser && user && (
+        <Dialog open={showVideoCall} onOpenChange={setShowVideoCall}>
+          <DialogContent className="sm:max-w-[900px] p-0 h-[80vh] max-h-[600px]">
+            <DialogTitle className="sr-only">
+              Video call with {selectedUser.displayName}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              One-on-one video call with {selectedUser.displayName}
+            </DialogDescription>
+            <VideoCall
+              currentUserId={user.uid}
+              targetUserId={selectedUser.id}
+              onEndCall={() => setShowVideoCall(false)}
+              displayName={user.displayName || ''}
+              photoURL={user.photoURL || ''}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
