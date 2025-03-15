@@ -1,0 +1,75 @@
+/* Toast animations and modern styling */
+[data-sonner-toaster][data-theme="system"] {
+  --scale: 0.96;
+  --opacity: 0;
+  --y: 0.5rem;
+}
+
+[data-sonner-toaster][data-theme="system"] [data-sonner-toast] {
+  transform-origin: center top;
+  animation: toast-in 0.3s ease forwards;
+}
+
+[data-sonner-toaster][data-theme="system"] [data-sonner-toast][data-dismissible="true"] {
+  animation: toast-out 0.2s ease forwards;
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: var(--opacity);
+    transform: translateY(var(--y)) scale(var(--scale));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--y) * -1)) scale(var(--scale));
+  }
+}
+
+/* Modern glass effect */
+[data-sonner-toast] {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 
+    0 4px 6px -1px rgb(0 0 0 / 0.1), 
+    0 2px 4px -2px rgb(0 0 0 / 0.1),
+    0 0 0 1px rgb(255 255 255 / 0.05) inset;
+}
+
+/* Success toast glow effect */
+[data-sonner-toast][data-type="success"] {
+  box-shadow: 
+    0 4px 12px rgb(34 197 94 / 0.15),
+    0 0 0 1px rgb(255 255 255 / 0.05) inset;
+}
+
+/* Error toast glow effect */
+[data-sonner-toast][data-type="error"] {
+  box-shadow: 
+    0 4px 12px rgb(239 68 68 / 0.15),
+    0 0 0 1px rgb(255 255 255 / 0.05) inset;
+}
+
+/* Loading spinner animation */
+[data-sonner-toast] [data-icon] {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+} 

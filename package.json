@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "date-fns": "^2.30.0",
-    "next": "^14.0.0"
+    "next": "^14.0.0",
+    "sonner": "^2.0.1"
   }
 }
