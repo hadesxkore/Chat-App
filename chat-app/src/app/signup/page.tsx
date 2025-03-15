@@ -142,12 +142,12 @@ export default function SignUpPage() {
         </Card>
       </motion.div>
 
-      {/* Developer Information Footer - Repositioned */}
+      {/* Developer Information - Left Side */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="absolute bottom-4 right-4 text-right"
+        className="absolute bottom-4 left-4 text-left"
       >
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text p-2 rounded-lg">
           <h3 className="text-base font-bold text-transparent">Developed by</h3>

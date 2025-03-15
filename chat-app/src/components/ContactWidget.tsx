@@ -67,7 +67,7 @@ export function ContactWidget() {
     <>
       {/* Arrow Toggle Button with Floating Label */}
       <motion.div
-        className="fixed bottom-40 right-4 z-50 flex items-center gap-2"
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-2"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ delay: 1 }}
@@ -86,7 +86,7 @@ export function ContactWidget() {
           }}
           className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg whitespace-nowrap"
         >
-          {isOpen ? 'Close Message' : 'Message Me'}
+          {isOpen ? 'Close Message' : 'Message me'}
         </motion.div>
 
         <Button
@@ -117,7 +117,7 @@ export function ContactWidget() {
 
             {/* Contact Form */}
             <motion.div
-              className="fixed bottom-52 right-4 z-50 w-80"
+              className="fixed bottom-16 right-4 z-50 w-80"
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
