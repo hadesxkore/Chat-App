@@ -86,7 +86,7 @@ export function ContactWidget() {
           }}
           className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg whitespace-nowrap"
         >
-          {isOpen ? 'Close Message' : 'Message Developer'}
+          {isOpen ? 'Close Message' : 'Message Me'}
         </motion.div>
 
         <Button
