@@ -37,6 +37,8 @@ import GroupMessages from "@/components/GroupMessages";
 import IncomingCallAlert from '@/components/IncomingCallAlert';
 import VideoCallButton from '@/components/VideoCallButton';
 import VideoCall from '@/components/VideoCall';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { User, FileText, CheckCircle, Ban } from 'lucide-react';
 
 interface User {
   id: string;
@@ -2204,14 +2206,47 @@ export default function ChatPage() {
                     </Button>
                   )}
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={() => setShowChatOptions(!showChatOptions)}
-                  >
-                    <MoreVertical size={20} />
-                  </Button>
+                  {/* Replace the non-functional button with a proper dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                      >
+                        <MoreVertical size={20} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setShowUserProfile(true)}>
+                        <User className="mr-2 h-4 w-4" />
+                        View Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowEditNickname(true)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Set Nickname
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleBlockUser(selectedUser.id)}>
+                        {blockedUsers.includes(selectedUser.id) ? (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Unblock User
+                          </>
+                        ) : (
+                          <>
+                            <Ban className="mr-2 h-4 w-4" />
+                            Block User
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setShowFilesPhotosSheet(true)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Shared Files & Photos
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
               

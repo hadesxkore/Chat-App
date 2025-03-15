@@ -50,7 +50,7 @@ interface GroupCallData {
 }
 
 // Configuration for WebRTC with improved connectivity options
-const servers = {
+const servers: RTCConfiguration = {
   iceServers: [
     {
       urls: [
@@ -76,9 +76,18 @@ const servers = {
       urls: 'turn:openrelay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject',
+    },
+    // Additional public STUN/TURN servers for better connectivity
+    {
+      urls: 'stun:stun.stunprotocol.org:3478'
+    },
+    {
+      urls: 'stun:stun.freeswitch.org:3478'
     }
   ],
   iceCandidatePoolSize: 20,
+  // Additional configuration to help connections
+  iceTransportPolicy: 'all' as RTCIceTransportPolicy
 };
 
 const GroupVideoCall = ({ 
@@ -134,23 +143,38 @@ const GroupVideoCall = ({
         if (callDoc.exists()) {
           const callData = callDoc.data();
           
+          // Extremely careful handling of participants array
+          let currentParticipants: string[] = [];
+          
+          // Check if participants array exists
+          if (callData && Array.isArray(callData.participants)) {
+            currentParticipants = callData.participants;
+          } else {
+            console.warn('Participants array not found in call data, creating new array');
+          }
+          
           // Remove ourselves from participants list
-          const updatedParticipants = callData.participants.filter(
+          const updatedParticipants = currentParticipants.filter(
             (id: string) => id !== currentUserId
           );
           
-          if (callData.creatorId === currentUserId || updatedParticipants.length === 0) {
-            // If we're the creator or last person, mark call as ended
-            await updateDoc(doc(db, 'groupCalls', callId), {
-              status: 'ended',
-              participants: updatedParticipants,
-              endTime: serverTimestamp()
-            });
-          } else {
-            // Just remove ourselves from participants
-            await updateDoc(doc(db, 'groupCalls', callId), {
-              participants: updatedParticipants
-            });
+          try {
+            if (callData && callData.creatorId === currentUserId || updatedParticipants.length === 0) {
+              // If we're the creator or last person, mark call as ended
+              await updateDoc(doc(db, 'groupCalls', callId), {
+                status: 'ended',
+                participants: updatedParticipants,
+                endTime: serverTimestamp()
+              });
+            } else {
+              // Just remove ourselves from participants
+              await updateDoc(doc(db, 'groupCalls', callId), {
+                participants: updatedParticipants
+              });
+            }
+          } catch (error) {
+            console.error('Error updating participants during cleanup:', error);
+            // If this fails, the call might still show us as a participant, but it's not critical
           }
         }
       } catch (error) {
@@ -207,20 +231,102 @@ const GroupVideoCall = ({
         
         // Add ourselves to participants
         const callData = existingCall.data();
-        if (!callData.participants.includes(currentUserId)) {
-          await updateDoc(doc(db, 'groupCalls', callDocId), {
-            participants: [...callData.participants, currentUserId]
-          });
+        
+        // Extremely careful handling of participants array
+        let currentParticipants: string[] = [];
+        
+        // Check if callData exists
+        if (callData) {
+          // Check if participants array exists
+          if (Array.isArray(callData.participants)) {
+            currentParticipants = callData.participants;
+          } else {
+            console.warn('Participants array not found in call data, creating new array');
+          }
+        } else {
+          console.warn('No call data found, creating new participants array');
+        }
+        
+        // Only update if we're not already in participants list
+        if (!currentParticipants.includes(currentUserId)) {
+          // Create a new array with us added - this ensures we have a valid array
+          const updatedParticipants = [...currentParticipants, currentUserId];
+          
+          try {
+            // Update the document with the new array
+            await updateDoc(doc(db, 'groupCalls', callDocId), {
+              participants: updatedParticipants
+            });
+            
+            // Add a system message that user joined the call
+            await addDoc(collection(db, 'groupMessages'), {
+              groupId,
+              senderId: currentUserId,
+              senderName: displayName,
+              content: `${displayName} joined the call`,
+              timestamp: serverTimestamp(),
+              type: 'system'
+            });
+          } catch (error) {
+            console.error('Error updating participants:', error);
+            // If updating the participants fails, we'll continue anyway
+            // The user can still see and hear others, but might not appear in their list
+          }
         }
       }
       
       setCallId(callDocId);
       
-      // Set up local media
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
+      // Set up local media with fallbacks for users without camera
+      let stream: MediaStream | null = null;
+      let hasVideo = false;
+      let hasAudio = false;
+      let isViewOnly = false;
+
+      try {
+        // First try to get both video and audio
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: true, 
+            audio: true 
+          });
+          hasVideo = true;
+          hasAudio = true;
+        } catch (error) {
+          console.log('Could not access both camera and microphone:', error);
+          
+          // Try to get just audio
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              video: false, 
+              audio: true 
+            });
+            hasAudio = true;
+            setIsVideoOff(true); // Update UI to show video is off
+          } catch (audioError) {
+            console.log('Could not access microphone:', audioError);
+            // Create an empty stream for participants without audio/video
+            stream = new MediaStream();
+            setIsVideoOff(true);
+            setIsMicMuted(true);
+            isViewOnly = true;
+            toast.info('Joined in view-only mode. You cannot broadcast audio or video, but can see others.');
+          }
+        }
+      } catch (error) {
+        console.error('Error accessing media devices:', error);
+        stream = new MediaStream(); // Fallback to empty stream
+        setIsVideoOff(true);
+        setIsMicMuted(true);
+        isViewOnly = true;
+        toast.info('Joined in view-only mode. You cannot broadcast audio or video, but can see others.');
+      }
+      
+      // Always ensure we have a valid stream
+      if (!stream) {
+        stream = new MediaStream();
+        isViewOnly = true;
+      }
       
       localStreamRef.current = stream;
       if (localVideoRef.current) {
@@ -234,7 +340,8 @@ const GroupVideoCall = ({
           id: currentUserId,
           displayName,
           photoURL,
-          stream
+          stream,
+          connectionState: 'connected'
         }
       ]);
       
@@ -247,7 +354,7 @@ const GroupVideoCall = ({
       
     } catch (error) {
       console.error('Error initializing call:', error);
-      toast.error('Failed to start call. Please check your camera and microphone permissions.');
+      toast.error('Failed to join call. Please try again.');
       cleanup();
       onEndCall();
     }
@@ -276,15 +383,26 @@ const GroupVideoCall = ({
       }
       
       // Handle participants list changes
-      const currentParticipants = new Set(participants.map(p => p.id));
-      const newParticipants = new Set(callData.participants);
+      const currentParticipantIds = participants.map(p => p.id);
+      const currentParticipantsSet = new Set(currentParticipantIds);
       
-      // Participants who joined
-      const newParticipantsArray = Array.from(newParticipants);
+      // Extremely careful handling of participants array from Firestore
+      let firestoreParticipants: string[] = [];
+      
+      if (callData && Array.isArray(callData.participants)) {
+        firestoreParticipants = callData.participants;
+      } else {
+        console.warn('Participants array from Firestore is undefined or not an array');
+      }
+      
+      const newParticipantsSet = new Set(firestoreParticipants);
+      
+      // Participants who joined - convert Set to Array before iteration
+      const newParticipantsArray = Array.from(newParticipantsSet);
       for (const participantId of newParticipantsArray) {
         if (
           participantId !== currentUserId && 
-          !currentParticipants.has(participantId)
+          !currentParticipantsSet.has(participantId)
         ) {
           // New participant joined - establish connection
           await setupPeerConnection(participantId, callDocId);
@@ -292,11 +410,10 @@ const GroupVideoCall = ({
       }
       
       // Participants who left
-      const currentParticipantsArray = Array.from(currentParticipants);
-      for (const participantId of currentParticipantsArray) {
+      for (const participantId of currentParticipantIds) {
         if (
           participantId !== currentUserId && 
-          !newParticipants.has(participantId)
+          !newParticipantsSet.has(participantId)
         ) {
           // Participant left - clean up their connection
           cleanupParticipantConnection(participantId);
@@ -310,6 +427,8 @@ const GroupVideoCall = ({
   // Set up peer connection with another participant
   const setupPeerConnection = async (participantId: string, callDocId: string) => {
     try {
+      console.log(`Setting up peer connection with ${participantId}`);
+      
       // Get participant info
       const userDoc = await getDoc(doc(db, 'users', participantId));
       if (!userDoc.exists()) {
@@ -318,6 +437,7 @@ const GroupVideoCall = ({
       }
       
       const userData = userDoc.data();
+      console.log(`Participant data retrieved: ${userData.displayName}`);
       
       // Add to participants list without stream yet
       setParticipants(prev => [
@@ -330,54 +450,13 @@ const GroupVideoCall = ({
         }
       ]);
       
-      // Create connection
+      // Create connection with enhanced debugging
       const peerConnection = new RTCPeerConnection(servers);
-      peerConnectionsRef.current[participantId] = peerConnection;
+      console.log(`Created new RTCPeerConnection for ${participantId}`);
       
-      // Add local tracks to the connection
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => {
-          if (localStreamRef.current) {
-            peerConnection.addTrack(track, localStreamRef.current);
-          }
-        });
-      }
-      
-      // Handle remote stream
-      peerConnection.ontrack = (event) => {
-        if (event.streams[0]) {
-          console.log('Received remote track from participant:', participantId);
-          // Create a new stream to ensure it triggers UI updates
-          const newStream = new MediaStream();
-          event.streams[0].getTracks().forEach(track => {
-            newStream.addTrack(track);
-          });
-          
-          // Update participant with their stream
-          setParticipants(prev => {
-            const updatedParticipants = prev.map(p => {
-              if (p.id === participantId) {
-                return {
-                  ...p,
-                  stream: newStream,
-                  connectionState: 'connected'
-                };
-              }
-              return p;
-            });
-            
-            // Set as active participant if none is selected
-            if (!activeParticipant || activeParticipant === participantId) {
-              setActiveParticipant(participantId);
-            }
-            
-            return updatedParticipants;
-          });
-        }
-      };
-      
-      // Connection state change
+      // Monitor connection state changes
       peerConnection.onconnectionstatechange = () => {
+        console.log(`Connection state changed for ${participantId}: ${peerConnection.connectionState}`);
         setParticipants(prev => {
           return prev.map(p => {
             if (p.id === participantId) {
@@ -389,33 +468,158 @@ const GroupVideoCall = ({
             return p;
           });
         });
+        
+        // Attempt recovery if connection fails
+        if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+          console.log(`Connection ${peerConnection.connectionState} for ${participantId}, attempting recovery...`);
+          
+          // When reconnection is needed, we can restart ICE gathering
+          try {
+            // If we're the offerer, try to create a new offer to restart ICE
+            const shouldCreateOffer = currentUserId < participantId;
+            if (shouldCreateOffer) {
+              console.log(`Attempting to restart ICE for ${participantId}`);
+              peerConnection.restartIce();
+            }
+          } catch (error) {
+            console.error('Error during connection recovery:', error);
+          }
+        }
+      };
+      
+      // Monitor ICE connection state
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log(`ICE connection state for ${participantId}: ${peerConnection.iceConnectionState}`);
+      };
+      
+      // Track ICE gathering state
+      peerConnection.onicegatheringstatechange = () => {
+        console.log(`ICE gathering state for ${participantId}: ${peerConnection.iceGatheringState}`);
+      };
+      
+      // Store the connection
+      peerConnectionsRef.current[participantId] = peerConnection;
+      
+      // Add local tracks to the connection
+      if (localStreamRef.current) {
+        const tracks = localStreamRef.current.getTracks();
+        console.log(`Adding ${tracks.length} local tracks to connection for ${participantId}`);
+        
+        if (tracks && tracks.length > 0) {
+          tracks.forEach(track => {
+            if (localStreamRef.current) {
+              try {
+                const sender = peerConnection.addTrack(track, localStreamRef.current);
+                console.log(`Added ${track.kind} track to peer connection`);
+              } catch (error) {
+                console.error(`Error adding ${track.kind} track to peer connection:`, error);
+              }
+            }
+          });
+        } else {
+          console.warn(`No local tracks to add to peer connection with ${participantId}`);
+        }
+      } else {
+        console.warn(`No local stream to add to peer connection with ${participantId}`);
+      }
+      
+      // Handle remote stream
+      peerConnection.ontrack = (event) => {
+        console.log(`Received tracks from ${participantId}:`, event.streams);
+        
+        if (event.streams && event.streams[0]) {
+          console.log(`Processing ${event.streams[0].getTracks().length} tracks from participant: ${participantId}`);
+          
+          // Create a new stream to ensure it triggers UI updates
+          const newStream = new MediaStream();
+          event.streams[0].getTracks().forEach(track => {
+            console.log(`Adding remote ${track.kind} track to local stream`);
+            newStream.addTrack(track);
+          });
+          
+          // Update participant with their stream
+          setParticipants(prev => {
+            const updatedParticipants = prev.map(p => {
+              if (p.id === participantId) {
+                console.log(`Updated stream for participant ${participantId}`);
+                return {
+                  ...p,
+                  stream: newStream,
+                  connectionState: 'connected'
+                };
+              }
+              return p;
+            });
+            
+            // Set as active participant if none is selected
+            if (!activeParticipant || activeParticipant === participantId) {
+              console.log(`Setting ${participantId} as active participant`);
+              setActiveParticipant(participantId);
+            }
+            
+            return updatedParticipants;
+          });
+        } else {
+          console.warn(`Received track event without streams for ${participantId}`);
+        }
       };
       
       // Determine who creates the offer (to avoid both creating offers)
       // The participant with the lexicographically smaller ID creates the offer
       const shouldCreateOffer = currentUserId < participantId;
+      console.log(`Should create offer for ${participantId}: ${shouldCreateOffer}`);
       
       if (shouldCreateOffer) {
-        // Create and send offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        
-        // Store offer in Firestore
-        const callConnectionsRef = collection(db, 'groupCalls', callDocId, 'connections');
-        await setDoc(doc(callConnectionsRef, `${currentUserId}_${participantId}`), {
-          offer: {
-            type: offer.type,
-            sdp: offer.sdp
-          },
-          offerer: currentUserId,
-          receiver: participantId,
-          timestamp: serverTimestamp()
-        });
+        try {
+          // Create and send offer
+          console.log(`Creating offer for ${participantId}`);
+          const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+            iceRestart: true // Helps with connection issues
+          });
+          
+          if (!offer || !offer.sdp) {
+            console.error(`Failed to create valid offer for ${participantId}`);
+            return;
+          }
+          
+          console.log(`Setting local description for ${participantId}`);
+          await peerConnection.setLocalDescription(offer);
+          
+          // Store offer in Firestore
+          const callConnectionsRef = collection(db, 'groupCalls', callDocId, 'connections');
+          
+          // Make sure we don't have undefined values in the offer
+          if (offer && offer.type && offer.sdp) {
+            console.log(`Storing offer in Firestore for ${participantId}`);
+            try {
+              await setDoc(doc(callConnectionsRef, `${currentUserId}_${participantId}`), {
+                offer: {
+                  type: offer.type,
+                  sdp: offer.sdp
+                },
+                offerer: currentUserId,
+                receiver: participantId,
+                timestamp: serverTimestamp()
+              });
+              console.log(`Offer stored successfully for ${participantId}`);
+            } catch (error) {
+              console.error(`Error storing offer in Firestore for ${participantId}:`, error);
+            }
+          } else {
+            console.error(`Invalid offer data for ${participantId}, cannot store in Firestore`);
+          }
+        } catch (error) {
+          console.error(`Error creating offer for ${participantId}:`, error);
+        }
       }
       
-      // Listen for ICE candidates
+      // Listen for ICE candidates from local connection
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log(`New ICE candidate for connection with ${participantId}:`, event.candidate.type);
+          
           // Store candidate in Firestore
           const connectionId = shouldCreateOffer 
             ? `${currentUserId}_${participantId}` 
@@ -430,11 +634,22 @@ const GroupVideoCall = ({
             'candidates'
           );
           
-          setDoc(doc(candidatesRef), {
-            ...event.candidate.toJSON(),
-            sender: currentUserId,
-            timestamp: serverTimestamp()
-          });
+          const candidateData = event.candidate.toJSON();
+          // Make sure we don't have undefined values
+          if (candidateData) {
+            try {
+              setDoc(doc(candidatesRef), {
+                ...candidateData,
+                sender: currentUserId,
+                timestamp: serverTimestamp()
+              });
+              console.log(`ICE candidate stored for ${participantId}`);
+            } catch (error) {
+              console.error(`Error storing ICE candidate for ${participantId}:`, error);
+            }
+          }
+        } else {
+          console.log(`ICE candidate gathering completed for ${participantId}`);
         }
       };
       
@@ -446,32 +661,90 @@ const GroupVideoCall = ({
       const connectionRef = doc(db, 'groupCalls', callDocId, 'connections', connectionId);
       
       const unsubscribe = onSnapshot(connectionRef, async (snapshot) => {
-        if (!snapshot.exists()) return;
+        if (!snapshot.exists()) {
+          console.log(`No connection document exists for ${participantId}`);
+          return;
+        }
         
         const data = snapshot.data();
+        if (!data) {
+          console.log(`Empty connection data for ${participantId}`);
+          return;
+        }
         
-        if (data.offer && !shouldCreateOffer && !peerConnection.currentLocalDescription) {
-          // We received an offer, set remote description and create answer
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          
-          // Store answer
-          await updateDoc(connectionRef, {
-            answer: {
-              type: answer.type,
-              sdp: answer.sdp
-            },
-            timestamp: serverTimestamp()
-          });
-        } else if (data.answer && shouldCreateOffer && peerConnection.currentLocalDescription) {
-          // We received an answer to our offer
-          const answerDesc = new RTCSessionDescription(data.answer);
-          await peerConnection.setRemoteDescription(answerDesc);
+        try {
+          if (data.offer && !shouldCreateOffer && !peerConnection.currentLocalDescription) {
+            // We received an offer, set remote description and create answer
+            console.log(`Received offer from ${participantId}, creating answer`);
+            
+            if (!data.offer.sdp) {
+              console.error(`Received offer without SDP from ${participantId}`);
+              return;
+            }
+            
+            try {
+              console.log(`Setting remote description from ${participantId}'s offer`);
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+              
+              console.log(`Creating answer for ${participantId}`);
+              const answer = await peerConnection.createAnswer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+              });
+              
+              if (!answer || !answer.sdp) {
+                console.error(`Failed to create valid answer for ${participantId}`);
+                return;
+              }
+              
+              console.log(`Setting local description (answer) for ${participantId}`);
+              await peerConnection.setLocalDescription(answer);
+              
+              // Store answer safely
+              if (answer && answer.type && answer.sdp) {
+                console.log(`Storing answer in Firestore for ${participantId}`);
+                try {
+                  await updateDoc(connectionRef, {
+                    answer: {
+                      type: answer.type,
+                      sdp: answer.sdp
+                    },
+                    timestamp: serverTimestamp()
+                  });
+                  console.log(`Answer stored successfully for ${participantId}`);
+                } catch (error) {
+                  console.error(`Error storing answer in Firestore for ${participantId}:`, error);
+                }
+              } else {
+                console.error(`Invalid answer data for ${participantId}, cannot store in Firestore`);
+              }
+            } catch (error) {
+              console.error(`Error handling offer from ${participantId}:`, error);
+            }
+          } else if (data.answer && shouldCreateOffer && peerConnection.currentLocalDescription) {
+            // We received an answer to our offer
+            console.log(`Received answer from ${participantId}`);
+            
+            if (!data.answer.sdp) {
+              console.error(`Received answer without SDP from ${participantId}`);
+              return;
+            }
+            
+            try {
+              console.log(`Setting remote description from ${participantId}'s answer`);
+              const answerDesc = new RTCSessionDescription(data.answer);
+              await peerConnection.setRemoteDescription(answerDesc);
+              console.log(`Remote description set successfully for ${participantId}`);
+            } catch (error) {
+              console.error(`Error setting remote description from ${participantId}'s answer:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing signaling message from ${participantId}:`, error);
         }
       });
       
-      // Listen for ICE candidates
+      // Listen for ICE candidates from other participants
       const candidatesQuery = collection(
         db, 
         'groupCalls', 
@@ -486,16 +759,41 @@ const GroupVideoCall = ({
           if (change.type === 'added') {
             const data = change.doc.data();
             if (data.sender !== currentUserId) {
-              const candidate = new RTCIceCandidate({
-                sdpMLineIndex: data.sdpMLineIndex,
-                candidate: data.candidate,
-                sdpMid: data.sdpMid,
-              });
-              
+              console.log(`Received ICE candidate from ${participantId}`);
               try {
-                await peerConnection.addIceCandidate(candidate);
+                // Ensure we have all required fields before creating the candidate
+                if (!data.sdpMLineIndex || !data.candidate || !data.sdpMid) {
+                  console.error(`Incomplete ICE candidate data from ${participantId}`);
+                  return;
+                }
+                
+                const candidate = new RTCIceCandidate({
+                  sdpMLineIndex: data.sdpMLineIndex,
+                  candidate: data.candidate,
+                  sdpMid: data.sdpMid,
+                });
+                
+                // Only add if we have a remote description set
+                if (peerConnection.remoteDescription) {
+                  console.log(`Adding ICE candidate from ${participantId}`);
+                  await peerConnection.addIceCandidate(candidate);
+                } else {
+                  console.warn(`Received ICE candidate before remote description from ${participantId}, ignoring for now`);
+                  
+                  // Store the candidate to add later when we have a remote description
+                  setTimeout(async () => {
+                    if (peerConnection.remoteDescription) {
+                      console.log(`Now adding previously received ICE candidate from ${participantId}`);
+                      try {
+                        await peerConnection.addIceCandidate(candidate);
+                      } catch (error) {
+                        console.error(`Error adding delayed ICE candidate from ${participantId}:`, error);
+                      }
+                    }
+                  }, 2000); // Try again after 2 seconds
+                }
               } catch (error) {
-                console.error('Error adding ICE candidate:', error);
+                console.error(`Error processing ICE candidate from ${participantId}:`, error);
               }
             }
           }
@@ -549,25 +847,126 @@ const GroupVideoCall = ({
   };
   
   // Toggle microphone
-  const toggleMicrophone = () => {
-    if (localStreamRef.current) {
-      const audioTracks = localStreamRef.current.getAudioTracks();
-      audioTracks.forEach(track => {
-        track.enabled = !track.enabled;
+  const toggleMicrophone = async () => {
+    if (!localStreamRef.current) return;
+    
+    if (isMicMuted) {
+      // Try to enable audio if there are no audio tracks
+      if (localStreamRef.current.getAudioTracks().length === 0) {
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audioTrack = audioStream.getAudioTracks()[0];
+          
+          // Add the new audio track to our existing stream
+          localStreamRef.current.addTrack(audioTrack);
+          
+          // Update all peer connections with the new track
+          Object.values(peerConnectionsRef.current).forEach(pc => {
+            pc.addTrack(audioTrack, localStreamRef.current!);
+          });
+          
+          setIsMicMuted(false);
+        } catch (error) {
+          console.error('Could not enable audio:', error);
+          toast.error('Could not enable microphone. Please check your microphone permissions.');
+          return;
+        }
+      } else {
+        // Just unmute existing tracks
+        localStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = true;
+        });
+        setIsMicMuted(false);
+      }
+    } else {
+      // Mute audio
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = false;
       });
-      setIsMicMuted(!isMicMuted);
+      setIsMicMuted(true);
     }
+    
+    // Update our participant in the list
+    setParticipants(prevParticipants => {
+      const updatedParticipants = [...prevParticipants];
+      const currentUserIndex = updatedParticipants.findIndex(p => p.id === currentUserId);
+      if (currentUserIndex >= 0 && localStreamRef.current) {
+        updatedParticipants[currentUserIndex] = {
+          ...updatedParticipants[currentUserIndex],
+          stream: localStreamRef.current
+        };
+      }
+      return updatedParticipants;
+    });
   };
   
-  // Toggle video
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      const videoTracks = localStreamRef.current.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = !track.enabled;
+  // Toggle video on/off
+  const toggleVideo = async () => {
+    if (!localStreamRef.current) return;
+    
+    if (isVideoOff) {
+      // Try to enable video
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoTrack = videoStream.getVideoTracks()[0];
+        
+        // Add the new video track to our existing stream
+        localStreamRef.current.addTrack(videoTrack);
+        
+        // Update all peer connections with the new track
+        Object.values(peerConnectionsRef.current).forEach(pc => {
+          const senders = pc.getSenders();
+          const videoSender = senders.find(sender => 
+            sender.track && sender.track.kind === 'video'
+          );
+          
+          if (videoSender) {
+            videoSender.replaceTrack(videoTrack);
+          } else {
+            pc.addTrack(videoTrack, localStreamRef.current!);
+          }
+        });
+        
+        setIsVideoOff(false);
+      } catch (error) {
+        console.error('Could not enable video:', error);
+        toast.error('Could not enable video. Please check your camera permissions.');
+      }
+    } else {
+      // Disable video
+      localStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = false;
+        track.stop();
+        localStreamRef.current!.removeTrack(track);
       });
-      setIsVideoOff(!isVideoOff);
+      
+      // Update peer connections
+      Object.values(peerConnectionsRef.current).forEach(pc => {
+        const senders = pc.getSenders();
+        const videoSender = senders.find(sender => 
+          sender.track && sender.track.kind === 'video'
+        );
+        
+        if (videoSender) {
+          pc.removeTrack(videoSender);
+        }
+      });
+      
+      setIsVideoOff(true);
     }
+    
+    // Update our participant in the list
+    setParticipants(prevParticipants => {
+      const updatedParticipants = [...prevParticipants];
+      const currentUserIndex = updatedParticipants.findIndex(p => p.id === currentUserId);
+      if (currentUserIndex >= 0 && localStreamRef.current) {
+        updatedParticipants[currentUserIndex] = {
+          ...updatedParticipants[currentUserIndex],
+          stream: localStreamRef.current
+        };
+      }
+      return updatedParticipants;
+    });
   };
   
   // End call and clean up
