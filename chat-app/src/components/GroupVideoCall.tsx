@@ -49,16 +49,36 @@ interface GroupCallData {
   endTime?: any;
 }
 
-// Configuration for WebRTC
+// Configuration for WebRTC with improved connectivity options
 const servers = {
   iceServers: [
     {
       urls: [
         'stun:stun1.l.google.com:19302',
         'stun:stun2.l.google.com:19302',
+        'stun:stun.l.google.com:19302',
+        'stun:stun3.l.google.com:19302',
+        'stun:stun4.l.google.com:19302',
       ],
     },
+    // Free TURN servers - these help when users are behind difficult NATs/firewalls
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    }
   ],
+  iceCandidatePoolSize: 20,
 };
 
 const GroupVideoCall = ({ 
@@ -326,13 +346,20 @@ const GroupVideoCall = ({
       // Handle remote stream
       peerConnection.ontrack = (event) => {
         if (event.streams[0]) {
+          console.log('Received remote track from participant:', participantId);
+          // Create a new stream to ensure it triggers UI updates
+          const newStream = new MediaStream();
+          event.streams[0].getTracks().forEach(track => {
+            newStream.addTrack(track);
+          });
+          
           // Update participant with their stream
           setParticipants(prev => {
             const updatedParticipants = prev.map(p => {
               if (p.id === participantId) {
                 return {
                   ...p,
-                  stream: event.streams[0],
+                  stream: newStream,
                   connectionState: 'connected'
                 };
               }
@@ -598,7 +625,7 @@ const GroupVideoCall = ({
             <div className="flex flex-col items-center justify-center">
               <Avatar className="h-24 w-24 mb-4">
                 <AvatarImage src={photoURL} />
-                <AvatarFallback>{displayName[0] || '?'}</AvatarFallback>
+                <AvatarFallback>{displayName && displayName[0] || '?'}</AvatarFallback>
               </Avatar>
               <h3 className="text-xl font-semibold mb-2">Joining call...</h3>
               <div className="mt-4 flex space-x-4">
@@ -614,12 +641,21 @@ const GroupVideoCall = ({
                 <div className="w-full h-full">
                   {participants.find(p => p.id === activeParticipant)?.stream ? (
                     <video 
+                      key={`video-${activeParticipant}`}
                       autoPlay 
                       playsInline
+                      muted={activeParticipant === currentUserId}
                       className="w-full h-full object-cover"
                       ref={el => {
-                        if (el && participants.find(p => p.id === activeParticipant)?.stream) {
-                          el.srcObject = participants.find(p => p.id === activeParticipant)?.stream || null;
+                        if (el) {
+                          // Force reattach the stream to ensure it's displayed
+                          const participant = participants.find(p => p.id === activeParticipant);
+                          if (participant?.stream && el.srcObject !== participant.stream) {
+                            console.log('Setting stream for active participant:', activeParticipant);
+                            el.srcObject = participant.stream;
+                            // Try to play the video (for autoplay issues)
+                            el.play().catch(e => console.error('Error playing video:', e));
+                          }
                         }
                       }}
                     />
@@ -628,13 +664,14 @@ const GroupVideoCall = ({
                       <Avatar className="h-32 w-32">
                         <AvatarImage src={participants.find(p => p.id === activeParticipant)?.photoURL} />
                         <AvatarFallback>
-                          {participants.find(p => p.id === activeParticipant)?.displayName[0] || '?'}
+                          {participants.find(p => p.id === activeParticipant)?.displayName && 
+                           participants.find(p => p.id === activeParticipant)?.displayName[0] || '?'}
                         </AvatarFallback>
                       </Avatar>
                     </div>
                   )}
                   <div className="absolute bottom-2 left-2 text-sm bg-black/50 text-white px-2 py-0.5 rounded">
-                    {participants.find(p => p.id === activeParticipant)?.displayName}
+                    {participants.find(p => p.id === activeParticipant)?.displayName || 'User'}
                     {participants.find(p => p.id === activeParticipant)?.id === currentUserId ? ' (You)' : ''}
                   </div>
                 </div>
@@ -667,13 +704,29 @@ const GroupVideoCall = ({
                       ? 'bg-primary/10 border border-primary/20'
                       : 'hover:bg-accent'
                   }`}
-                  onClick={() => setParticipantAsActive(participant.id)}
+                  onClick={() => {
+                    setParticipantAsActive(participant.id);
+                    // Force refresh the stream connection when selecting a participant
+                    if (participant.stream) {
+                      const updatedParticipants = [...participants];
+                      const index = updatedParticipants.findIndex(p => p.id === participant.id);
+                      if (index >= 0) {
+                        // Clone the stream to force a refresh
+                        const refreshedStream = participant.stream;
+                        updatedParticipants[index] = {
+                          ...participant,
+                          stream: refreshedStream
+                        };
+                        setParticipants(updatedParticipants);
+                      }
+                    }
+                  }}
                 >
                   <div className="flex items-center space-x-2">
                     <div className="relative">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={participant.photoURL} />
-                        <AvatarFallback>{participant.displayName[0] || '?'}</AvatarFallback>
+                        <AvatarFallback>{participant.displayName && participant.displayName[0] || '?'}</AvatarFallback>
                       </Avatar>
                       <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${
                         participant.connectionState === 'connected' 
@@ -685,7 +738,7 @@ const GroupVideoCall = ({
                     </div>
                     <div>
                       <p className="text-sm font-medium truncate max-w-[120px]">
-                        {participant.displayName}
+                        {participant.displayName || 'User'}
                         {participant.id === currentUserId ? ' (You)' : ''}
                       </p>
                       <p className="text-xs text-muted-foreground capitalize">
@@ -703,7 +756,12 @@ const GroupVideoCall = ({
       {/* Local video (picture-in-picture) */}
       <div className="absolute bottom-20 left-4 w-1/5 max-w-[180px] rounded-lg overflow-hidden border-2 border-background shadow-lg">
         <video
-          ref={localVideoRef}
+          ref={el => {
+            if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+              el.srcObject = localStreamRef.current;
+              el.play().catch(e => console.error('Error playing local video:', e));
+            }
+          }}
           autoPlay
           playsInline
           muted
@@ -713,7 +771,7 @@ const GroupVideoCall = ({
           <div className="bg-muted w-full h-full flex items-center justify-center aspect-video">
             <Avatar className="h-16 w-16">
               <AvatarImage src={photoURL} />
-              <AvatarFallback>{displayName[0] || '?'}</AvatarFallback>
+              <AvatarFallback>{displayName && displayName[0] || '?'}</AvatarFallback>
             </Avatar>
           </div>
         )}

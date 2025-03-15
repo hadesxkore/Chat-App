@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, getDoc, addDoc, serverTimestamp, arrayUnion, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 // Remove the User import since we'll define it locally
@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Plus, X, Check, Users } from 'lucide-react';
+import { Search, Plus, X, Check, Users, Video } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Define User interface locally based on what's in page.tsx
@@ -62,6 +62,12 @@ export const GroupChatComponent = ({ currentUser, onSelect, activeGroupId }: Gro
   const [readStatuses, setReadStatuses] = useState<{[groupId: string]: Date}>({});
   const [groupSenders, setGroupSenders] = useState<{[senderId: string]: string}>({});
   const [activeGroup, setActiveGroup] = useState<string | undefined>(activeGroupId);
+  const [activeGroupCall, setActiveGroupCall] = useState<{
+    callId: string;
+    groupId: string;
+    groupName: string;
+    creatorName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -658,181 +664,318 @@ export const GroupChatComponent = ({ currentUser, onSelect, activeGroupId }: Gro
     }
   }, [groups, activeGroup]);
 
-  return (
-    <div className="space-y-4">
-      {/* Create Group Button */}
-      <div className="flex justify-between mb-2">
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full mr-2">
-              <Users className="mr-2 h-4 w-4" />
-              Create New Group
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create Group Chat</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Input
-                  id="name"
-                  placeholder="Group Name"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <div className="relative">
-                  <Input
-                    id="search"
-                    placeholder="Search Users"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full"
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                  >
-                    <Search size={20} />
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Selected Users */}
-              {selectedUsers.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Selected Users</label>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedUsers.map((user) => (
-                      <Badge key={user.id} variant="secondary" className="flex items-center gap-1">
-                        {user.displayName || user.email}
-                        <button onClick={() => removeUserFromSelection(user.id)} className="ml-1">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Search Results */}
-              {searchResults.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Search Results</label>
-                  <ScrollArea className="h-[200px] rounded-md border p-2">
-                    <div className="space-y-2">
-                      {searchResults.map((user) => (
-                        <div 
-                          key={user.id}
-                          className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={user.photoURL || '/default-avatar.png'} alt={user.displayName || user.email} />
-                              <AvatarFallback>{user.displayName?.[0] || user.email?.[0] || 'U'}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">{user.displayName || user.email}</p>
-                              <p className="text-xs text-muted-foreground">{user.email}</p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => addUserToSelection(user)}
-                            disabled={selectedUsers.some(u => u.id === user.id)}
-                          >
-                            {selectedUsers.some(u => u.id === user.id) ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Plus className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={createGroup} disabled={!newGroupName.trim() || selectedUsers.length === 0}>
-                Create Group
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Debug refresh button */}
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={refreshUnreadCounts}
-          title="Manually refresh unread counts"
-        >
-          Refresh
-        </Button>
-      </div>
-
-      {/* Group List */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Your Groups</h2>
-        {groups.length === 0 ? (
-          <p className="text-sm text-center text-muted-foreground">No groups found</p>
-        ) : (
-          <ScrollArea className="h-[400px]">
-            {groups.map((group) => (
-              <div
-                key={group.id}
-                className={`flex items-center space-x-3 p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer ${group.id === activeGroup ? 'bg-accent/70' : ''}`}
-                onClick={() => handleGroupClick(group.id, group.name)}
-              >
-                <div className="relative">
-                  <Avatar>
-                    <AvatarImage src={group.photoURL || '/group-avatar.png'} />
-                    <AvatarFallback>
-                      {group.name[0]?.toUpperCase() || 'G'}
-                    </AvatarFallback>
-                  </Avatar>
+  // Add this function to listen for active calls
+  const listenForActiveGroupCalls = useCallback(() => {
+    if (!currentUser) return () => {};
+    
+    console.log("Setting up group call listener");
+    
+    // Get all the groups the user is in
+    const userGroupsQuery = query(
+      collection(db, 'groupMembers'),
+      where('userId', '==', currentUser.id),
+      where('status', '==', 'active')
+    );
+    
+    // First get the user's groups
+    getDocs(userGroupsQuery).then(membershipDocs => {
+      const groupIds = membershipDocs.docs.map(doc => doc.data().groupId);
+      
+      if (groupIds.length === 0) return;
+      
+      // Now listen for active calls in any of these groups
+      const activeCallsQuery = query(
+        collection(db, 'groupCalls'),
+        where('groupId', 'in', groupIds),
+        where('status', '==', 'active')
+      );
+      
+      const unsubscribe = onSnapshot(activeCallsQuery, (snapshot) => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const callData = {
+              id: change.doc.id,
+              ...change.doc.data()
+            } as any;
+            
+            // Only show notification if:
+            // 1. This is a new or updated call
+            // 2. User is not already in the call
+            // 3. The call is active
+            if (
+              callData.status === 'active' && 
+              !callData.participants.includes(currentUser.id)
+            ) {
+              // Get group info for the notification
+              getDoc(doc(db, 'groups', callData.groupId)).then(groupDoc => {
+                if (groupDoc.exists()) {
+                  const groupData = groupDoc.data();
                   
-                  {/* Notification Badge */}
-                  {(group.unreadCount ?? 0) > 0 && (
-                    <Badge 
-                      className="absolute -top-1 -right-1 rounded-full h-5 w-5 flex items-center justify-center p-0 bg-red-600 text-white border-2 border-background text-xs font-bold"
-                      variant="default"
-                    >
-                      {(group.unreadCount ?? 0) > 99 ? '99+' : group.unreadCount ?? 0}
-                    </Badge>
-                  )}
+                  // Set active call information
+                  setActiveGroupCall({
+                    callId: change.doc.id,
+                    groupId: callData.groupId,
+                    groupName: groupData.name || 'Group Chat',
+                    creatorName: callData.creatorName || 'Someone'
+                  });
+                  
+                  // Show toast notification
+                  toast.message('Group Call Started', {
+                    description: `${callData.creatorName} started a call in ${groupData.name}`,
+                    action: {
+                      label: 'Join Call',
+                      onClick: () => {
+                        onSelect(callData.groupId, groupData.name);
+                      }
+                    },
+                    duration: 10000
+                  });
+                }
+              });
+            } else if (callData.status === 'ended') {
+              // Clear active call notification if the call ended
+              setActiveGroupCall(null);
+            }
+          } else if (change.type === 'removed') {
+            // Call was deleted
+            setActiveGroupCall(null);
+          }
+        });
+      });
+      
+      return unsubscribe;
+    });
+    
+    return () => {};
+  }, [currentUser, onSelect]);
+
+  // Add this to your useEffect that runs when component mounts
+  useEffect(() => {
+    if (currentUser?.id) {
+      // ... existing code ...
+      
+      // Add this line:
+      const unsubscribeFromCalls = listenForActiveGroupCalls();
+      
+      return () => {
+        // ... existing cleanup code ...
+        unsubscribeFromCalls();
+      };
+    }
+  }, [currentUser, listenForActiveGroupCalls]);
+
+  return (
+    <>
+      <div className="space-y-4">
+        {/* Create Group Button */}
+        <div className="flex justify-between mb-2">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full mr-2">
+                <Users className="mr-2 h-4 w-4" />
+                Create New Group
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create Group Chat</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Input
+                    id="name"
+                    placeholder="Group Name"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                  />
                 </div>
                 
-                <div className="flex flex-col flex-grow min-w-0">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-base font-semibold text-gray-800 truncate">
-                      {group.name}
-                    </h3>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      id="search"
+                      placeholder="Search Users"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={handleSearch}
+                      disabled={isSearching}
+                    >
+                      <Search size={20} />
+                    </Button>
                   </div>
-                  {group.lastMessage && (
-                    <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                      {getFormattedLastMessage(group)}
-                    </span>
-                  )}
                 </div>
+                
+                {/* Selected Users */}
+                {selectedUsers.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Selected Users</label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedUsers.map((user) => (
+                        <Badge key={user.id} variant="secondary" className="flex items-center gap-1">
+                          {user.displayName || user.email}
+                          <button onClick={() => removeUserFromSelection(user.id)} className="ml-1">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Search Results</label>
+                    <ScrollArea className="h-[200px] rounded-md border p-2">
+                      <div className="space-y-2">
+                        {searchResults.map((user) => (
+                          <div 
+                            key={user.id}
+                            className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={user.photoURL || '/default-avatar.png'} alt={user.displayName || user.email} />
+                                <AvatarFallback>{user.displayName?.[0] || user.email?.[0] || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{user.displayName || user.email}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => addUserToSelection(user)}
+                              disabled={selectedUsers.some(u => u.id === user.id)}
+                            >
+                              {selectedUsers.some(u => u.id === user.id) ? (
+                                <Check className="h-4 w-4" />
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
               </div>
-            ))}
-          </ScrollArea>
-        )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createGroup} disabled={!newGroupName.trim() || selectedUsers.length === 0}>
+                  Create Group
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Debug refresh button */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={refreshUnreadCounts}
+            title="Manually refresh unread counts"
+          >
+            Refresh
+          </Button>
+        </div>
+
+        {/* Group List */}
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-muted-foreground">Your Groups</h2>
+          {groups.length === 0 ? (
+            <p className="text-sm text-center text-muted-foreground">No groups found</p>
+          ) : (
+            <ScrollArea className="h-[400px]">
+              {groups.map((group) => (
+                <div
+                  key={group.id}
+                  className={`flex items-center space-x-3 p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer ${group.id === activeGroup ? 'bg-accent/70' : ''}`}
+                  onClick={() => handleGroupClick(group.id, group.name)}
+                >
+                  <div className="relative">
+                    <Avatar>
+                      <AvatarImage src={group.photoURL || '/group-avatar.png'} />
+                      <AvatarFallback>
+                        {group.name[0]?.toUpperCase() || 'G'}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    {/* Notification Badge */}
+                    {(group.unreadCount ?? 0) > 0 && (
+                      <Badge 
+                        className="absolute -top-1 -right-1 rounded-full h-5 w-5 flex items-center justify-center p-0 bg-red-600 text-white border-2 border-background text-xs font-bold"
+                        variant="default"
+                      >
+                        {(group.unreadCount ?? 0) > 99 ? '99+' : group.unreadCount ?? 0}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col flex-grow min-w-0">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-base font-semibold text-gray-800 truncate">
+                        {group.name}
+                      </h3>
+                    </div>
+                    {group.lastMessage && (
+                      <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                        {getFormattedLastMessage(group)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Active Call Banner */}
+      {activeGroupCall && (
+        <div className="fixed bottom-4 right-4 bg-card border border-primary shadow-lg rounded-lg p-4 w-80 z-50">
+          <div className="flex items-start space-x-4">
+            <div className="p-2 rounded-full bg-primary/10">
+              <Video className="h-8 w-8 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold">{activeGroupCall.groupName}</h4>
+              <p className="text-sm text-muted-foreground">
+                Call started by {activeGroupCall.creatorName}
+              </p>
+              <div className="mt-3 space-x-2">
+                <Button 
+                  size="sm" 
+                  className="bg-primary text-primary-foreground"
+                  onClick={() => {
+                    onSelect(activeGroupCall.groupId, activeGroupCall.groupName);
+                  }}
+                >
+                  Join Now
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setActiveGroupCall(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

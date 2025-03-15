@@ -33,7 +33,9 @@ import {
   User, 
   UserMinus, 
   Crown, 
-  Camera 
+  Camera,
+  Video,
+  Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -59,6 +61,8 @@ import data from '@emoji-mart/data';
 import { useTheme } from 'next-themes';
 import { useScript } from '@/hooks/useScript';
 import GroupVideoCallButton from './GroupVideoCallButton';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import GroupVideoCall from './GroupVideoCall';
 
 // Define necessary interfaces
 interface User {
@@ -312,6 +316,14 @@ const GroupMessages = ({ groupId, currentUser, groupName }: GroupMessagesProps) 
   const cloudinaryRef = useRef<any>();
   const widgetRef = useRef<any>();
   const cloudinaryScript = useScript("https://upload-widget.cloudinary.com/global/all.js");
+  
+  // Add these state variables inside the GroupMessages component
+  const [activeCall, setActiveCall] = useState<{
+    id: string;
+    creatorName: string;
+    participants: string[];
+  } | null>(null);
+  const [showCallDialog, setShowCallDialog] = useState(false);
   
   // Load group info and set up message listeners
   useEffect(() => {
@@ -913,500 +925,594 @@ const GroupMessages = ({ groupId, currentUser, groupName }: GroupMessagesProps) 
     });
   };
   
+  // Add this effect to detect active calls for this group
+  useEffect(() => {
+    if (!groupId) return;
+    
+    // Check if there's an active call for this group
+    const activeCallQuery = query(
+      collection(db, 'groupCalls'),
+      where('groupId', '==', groupId),
+      where('status', '==', 'active')
+    );
+    
+    const unsubscribe = onSnapshot(activeCallQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        // There is an active call
+        const callDoc = snapshot.docs[0];
+        const callData = callDoc.data();
+        
+        setActiveCall({
+          id: callDoc.id,
+          creatorName: callData.creatorName || 'Someone',
+          participants: callData.participants || []
+        });
+      } else {
+        // No active call
+        setActiveCall(null);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [groupId]);
+  
+  // Add a function to join the call
+  const joinGroupCall = () => {
+    if (activeCall) {
+      setShowCallDialog(true);
+    }
+  };
+  
+  // Add a function to handle the end call action
+  const handleEndCall = () => {
+    setShowCallDialog(false);
+  };
+  
   return (
-    <div className="flex flex-col overflow-hidden rounded-md border shadow-sm mb-2 h-screen">
-      {/* Group Header with Creator Label and Info Button */}
-      <div className="flex items-center p-3 border-b shrink-0 bg-background">
-        <div className="relative">
-          <Avatar className="h-9 w-9 mr-3">
-            <AvatarImage src={groupInfo?.photoURL || '/group-avatar.png'} />
-            <AvatarFallback>{groupName[0]?.toUpperCase() || 'G'}</AvatarFallback>
-          </Avatar>
-          {currentUser && groupInfo && groupMembers.length > 0 && 
-            groupMembers.find(m => m.isCreator)?.id && 
-            groupMembers.find(m => m.isCreator)?.id === (currentUser.id || currentUser.uid) && (
-              <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs px-1 rounded-sm">
-                Owner
-              </span>
-            )
-          }
-        </div>
-        <div className="flex-1">
-          <h2 className="font-semibold">{groupName}</h2>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            {groupMembers.length} members
-            {groupMembers.find(m => m.isCreator) && (
-              <span className="flex items-center">
-                • Created by {groupMembers.find(m => m.isCreator)?.displayName || 'Unknown'}
-                <Crown className="h-3 w-3 text-amber-500 ml-1" />
-              </span>
-            )}
-          </p>
-        </div>
-        
-        {/* Video Call Button */}
-        <GroupVideoCallButton
-          currentUserId={currentUser?.id || currentUser?.uid || ''}
-          groupId={groupId}
-          groupName={groupName}
-          displayName={currentUser?.displayName || 'User'}
-          photoURL={currentUser?.photoURL}
-          variant="ghost"
-          size="icon"
-        />
-        
-        {/* Info Sheet */}
-        <Sheet open={isInfoOpen} onOpenChange={setIsInfoOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Info className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[300px] sm:w-[450px]">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={groupInfo?.photoURL || '/group-avatar.png'} />
-                  <AvatarFallback>{groupName[0]?.toUpperCase() || 'G'}</AvatarFallback>
-                </Avatar>
-                {groupName}
-              </SheetTitle>
-              <SheetDescription>
-                Created on {groupInfo?.createdAt?.toDate ? format(groupInfo.createdAt.toDate(), 'PP') : 'Unknown date'}
-              </SheetDescription>
-            </SheetHeader>
-            
-            <Tabs defaultValue="members" className="mt-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="members">Members</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-              </TabsList>
-              
-              {/* Members Tab */}
-              <TabsContent value="members" className="mt-4">
-                <ScrollArea className="h-[calc(100vh-300px)]">
-                  <div className="space-y-3">
-                    {isGroupCreator() && (
-                      <div className="p-2 rounded-md bg-primary/10">
-                        <input 
-                          type="file"
-                          id="group-photo"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              updateGroupPhoto(e.target.files[0]);
-                            }
-                          }}
-                        />
-                        <label htmlFor="group-photo" className="flex items-center gap-2 text-sm cursor-pointer">
-                          <Camera className="h-4 w-4" />
-                          Change group photo
-                        </label>
-                      </div>
-                    )}
-                    
-                    {groupMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50">
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={member.photoURL || '/default-avatar.png'} />
-                              <AvatarFallback>{(member.displayName && member.displayName[0]) || (member.email && member.email[0]) || 'U'}</AvatarFallback>
-                            </Avatar>
-                            {member.isCreator && (
-                              <span className="absolute -bottom-1 -right-1">
-                                <Crown className="h-3 w-3 text-amber-500" />
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{member.displayName}</p>
-                            <p className="text-xs text-muted-foreground">{member.email}</p>
-                          </div>
-                        </div>
-                        
-                        {/* Kick member button (only shown to creator and not for self) */}
-                        {isGroupCreator() && member.id !== (currentUser.id || currentUser.uid) && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
-                            onClick={() => kickMember(member.id)}
-                          >
-                            <UserMinus className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-              
-              {/* Media Tab */}
-              <TabsContent value="media" className="mt-4">
-                <ScrollArea className="h-[calc(100vh-300px)]">
-                  {fileAttachments.filter(f => f.type === 'image').length === 0 ? (
-                    <p className="text-sm text-center text-muted-foreground py-4">No images shared in this group yet</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {fileAttachments
-                        .filter(f => f.type === 'image')
-                        .map((image, index) => (
-                          <div 
-                            key={index} 
-                            className="aspect-square relative rounded-md overflow-hidden cursor-pointer"
-                            onMouseEnter={() => setHoveredImageId(`image-${index}`)}
-                            onMouseLeave={() => setHoveredImageId(null)}
-                          >
-                            <img 
-                              src={image.url} 
-                              alt={image.name} 
-                              className="w-full h-full object-cover"
-                            />
-                            {hoveredImageId === `image-${index}` && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <a 
-                                  href={image.url} 
-                                  download={image.name}
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-white text-sm flex items-center gap-1 bg-primary/80 px-2 py-1 rounded-md"
-                                >
-                                  <Image className="h-4 w-4" />
-                                  Download
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-              
-              {/* Files Tab */}
-              <TabsContent value="files" className="mt-4">
-                <ScrollArea className="h-[calc(100vh-300px)]">
-                  {fileAttachments.filter(f => f.type === 'file' || f.type === 'voice').length === 0 ? (
-                    <p className="text-sm text-center text-muted-foreground py-4">No files shared in this group yet</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {fileAttachments
-                        .filter(f => f.type === 'file' || f.type === 'voice')
-                        .map((file, index) => (
-                          <div key={index} className="p-3 rounded-md bg-accent/30 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {file.type === 'voice' ? (
-                                <Mic className="h-4 w-4 text-primary" />
-                              ) : (
-                                <File className="h-4 w-4 text-primary" />
-                              )}
-                              <div>
-                                <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {file.size ? `${Math.round(file.size / 1024)} KB` : ''} • 
-                                  {file.timestamp?.toDate ? format(file.timestamp.toDate(), 'PP') : 'Unknown date'}
-                                </p>
-                              </div>
-                            </div>
-                            <a 
-                              href={file.url} 
-                              download={file.name}
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary hover:text-primary/80"
-                            >
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <File className="h-4 w-4" />
-                              </Button>
-                            </a>
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-            
-            <SheetFooter className="mt-auto">
-              <SheetClose asChild>
-                <Button variant="outline" size="sm">Close</Button>
-              </SheetClose>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </div>
+    <div className="flex flex-col h-full">
       
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 p-3 overflow-auto">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <p>Loading messages...</p>
+      {/* Active Call Banner */}
+      {activeCall && !showCallDialog && (
+        <div className="bg-accent/30 p-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-primary/20 p-2 rounded-full">
+              <Video className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                Active group call ({activeCall.participants.length} {activeCall.participants.length === 1 ? 'participant' : 'participants'})
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Started by {activeCall.creatorName}
+              </p>
+            </div>
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex justify-center items-center h-full text-muted-foreground">
-            <p>No messages yet. Start the conversation!</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message) => {
-              // Determine if message is from current user for alignment
-              const isCurrentUserMessage = currentUser && 
-                message.senderId === (currentUser.id || currentUser.uid);
-              
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.type === 'system' 
-                      ? 'justify-center' 
-                      : isCurrentUserMessage 
-                        ? 'justify-end' 
-                        : 'justify-start'
-                  }`}
-                >
-                  {message.type === 'system' ? (
-                    <div className="bg-accent/20 text-muted-foreground rounded-md px-3 py-2 text-sm max-w-[80%] text-center italic">
-                      {message.content}
-                    </div>
-                  ) : message.type === 'image' ? (
-                    <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-                      {!isCurrentUserMessage && (
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
-                          <AvatarFallback>
-                            {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        {!isCurrentUserMessage && (
-                          <p className="text-xs font-medium mb-1">
-                            {getMemberName(message.senderId)}
-                          </p>
-                        )}
-                        <div className={`rounded-lg overflow-hidden max-w-[240px]`}>
-                          <a 
-                            href={message.fileURL} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <img 
-                              src={message.fileURL} 
-                              alt="Shared image" 
-                              className="max-w-full h-auto rounded-lg"
-                            />
-                          </a>
-                          <div className="text-xs opacity-70 text-right mt-1 px-2">
-                            {formatMessageDate(message.timestamp)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : message.type === 'file' ? (
-                    <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-                      {!isCurrentUserMessage && (
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
-                          <AvatarFallback>
-                            {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        {!isCurrentUserMessage && (
-                          <p className="text-xs font-medium mb-1">
-                            {getMemberName(message.senderId)}
-                          </p>
-                        )}
-                        <div className={`${
-                          isCurrentUserMessage 
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-accent'
-                          } rounded-lg px-3 py-2 text-sm break-words`}
-                        >
-                          <a 
-                            href={message.fileURL} 
-                            download={message.fileName}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2"
-                          >
-                            <File className="h-4 w-4" />
-                            <span className="underline">{message.fileName}</span>
-                            <span className="text-xs">
-                              ({message.fileSize ? `${Math.round(message.fileSize / 1024)} KB` : 'Unknown size'})
-                            </span>
-                          </a>
-                          <div className="text-xs opacity-70 text-right mt-1">
-                            {formatMessageDate(message.timestamp)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : message.type === 'voice' ? (
-                    <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-                      {!isCurrentUserMessage && (
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
-                          <AvatarFallback>
-                            {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        {!isCurrentUserMessage && (
-                          <p className="text-xs font-medium mb-1">
-                            {getMemberName(message.senderId)}
-                          </p>
-                        )}
-                        <div className={`${
-                          isCurrentUserMessage 
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-accent'
-                          } rounded-lg p-2 text-sm`}
-                        >
-                          <AudioPlayer audioUrl={message.fileURL || ''} />
-                          <div className="text-xs opacity-70 text-right mt-1">
-                            {formatMessageDate(message.timestamp)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-                      {!isCurrentUserMessage && (
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
-                          <AvatarFallback>
-                            {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        {!isCurrentUserMessage && (
-                          <p className="text-xs font-medium mb-1">
-                            {getMemberName(message.senderId)}
-                          </p>
-                        )}
-                        <div className={`${
-                          isCurrentUserMessage 
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-accent'
-                          } rounded-lg px-3 py-2 text-sm break-words`}
-                        >
-                          {message.content}
-                          <span className="text-xs opacity-70 ml-2">
-                            {formatMessageDate(message.timestamp)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </ScrollArea>
-      
-      {/* Message Input */}
-      <form onSubmit={handleSendMessage} className="p-3 border-t flex flex-col space-y-2 shrink-0 bg-background">
-        {/* Upload progress */}
-        {isUploading && (
-          <div className="w-full bg-accent/30 rounded-full h-1.5 mb-1">
-            <div 
-              className="bg-primary h-1.5 rounded-full" 
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
-          </div>
-        )}
-        
-        <div className="flex items-center space-x-2">
-          <Input
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1"
-            disabled={isUploading}
-          />
-          
-          {/* Emoji Picker */}
-          <div className="relative">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="icon" 
-              className="rounded-full h-9 w-9"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              disabled={isUploading}
-            >
-              <Smile size={18} />
-            </Button>
-            <AnimatePresence>
-              {showEmojiPicker && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute bottom-full right-0 mb-2 z-10"
-                >
-                  <Picker
-                    data={data}
-                    onEmojiSelect={(emoji: any) => {
-                      setNewMessage(prev => prev + emoji.native);
-                      setShowEmojiPicker(false);
-                    }}
-                    previewPosition="none"
-                    skinTonePosition="none"
-                    theme={theme === 'dark' ? 'dark' : 'light'}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          {/* File attachment */}
-          <div className="relative">
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden" 
-              id="file-upload" 
-              disabled={isUploading}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="rounded-full h-9 w-9"
-              onClick={openCloudinaryWidget}
-              disabled={isUploading}
-            >
-              <Paperclip size={18} />
-            </Button>
-          </div>
-          
-          {/* Voice message */}
-          <VoiceRecorder onRecordingComplete={handleVoiceMessage} />
-          
           <Button 
-            type="submit" 
-            disabled={!newMessage.trim() || isUploading}
-            size="icon" 
-            className="rounded-full h-9 w-9"
+            size="sm" 
+            onClick={joinGroupCall}
+            className="bg-primary text-primary-foreground"
           >
-            <Send size={16} />
+            Join Call
           </Button>
         </div>
-      </form>
+      )}
+      
+      <div className="flex flex-col overflow-hidden rounded-md border shadow-sm mb-2 h-screen">
+        {/* Group Header with Creator Label and Info Button */}
+        <div className="flex items-center p-3 border-b shrink-0 bg-background">
+          <div className="relative">
+            <Avatar className="h-9 w-9 mr-3">
+              <AvatarImage src={groupInfo?.photoURL || '/group-avatar.png'} />
+              <AvatarFallback>{groupName[0]?.toUpperCase() || 'G'}</AvatarFallback>
+            </Avatar>
+            {currentUser && groupInfo && groupMembers.length > 0 && 
+              groupMembers.find(m => m.isCreator)?.id && 
+              groupMembers.find(m => m.isCreator)?.id === (currentUser.id || currentUser.uid) && (
+                <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs px-1 rounded-sm">
+                  Owner
+                </span>
+              )
+            }
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold">{groupName}</h2>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {groupMembers.length} members
+              {groupMembers.find(m => m.isCreator) && (
+                <span className="flex items-center">
+                  • Created by {groupMembers.find(m => m.isCreator)?.displayName || 'Unknown'}
+                  <Crown className="h-3 w-3 text-amber-500 ml-1" />
+                </span>
+              )}
+            </p>
+          </div>
+          
+          {/* Video Call Button */}
+          <GroupVideoCallButton
+            currentUserId={currentUser?.id || currentUser?.uid || ''}
+            groupId={groupId}
+            groupName={groupName}
+            displayName={currentUser?.displayName || 'User'}
+            photoURL={currentUser?.photoURL}
+            variant="ghost"
+            size="icon"
+          />
+          
+          {/* Info Sheet */}
+          <Sheet open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Info className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[450px]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={groupInfo?.photoURL || '/group-avatar.png'} />
+                    <AvatarFallback>{groupName[0]?.toUpperCase() || 'G'}</AvatarFallback>
+                  </Avatar>
+                  {groupName}
+                </SheetTitle>
+                <SheetDescription>
+                  Created on {groupInfo?.createdAt?.toDate ? format(groupInfo.createdAt.toDate(), 'PP') : 'Unknown date'}
+                </SheetDescription>
+              </SheetHeader>
+              
+              <Tabs defaultValue="members" className="mt-4">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="members">Members</TabsTrigger>
+                  <TabsTrigger value="media">Media</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                </TabsList>
+                
+                {/* Members Tab */}
+                <TabsContent value="members" className="mt-4">
+                  <ScrollArea className="h-[calc(100vh-300px)]">
+                    <div className="space-y-3">
+                      {isGroupCreator() && (
+                        <div className="p-2 rounded-md bg-primary/10">
+                          <input 
+                            type="file"
+                            id="group-photo"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files.length > 0) {
+                                updateGroupPhoto(e.target.files[0]);
+                              }
+                            }}
+                          />
+                          <label htmlFor="group-photo" className="flex items-center gap-2 text-sm cursor-pointer">
+                            <Camera className="h-4 w-4" />
+                            Change group photo
+                          </label>
+                        </div>
+                      )}
+                      
+                      {groupMembers.map((member) => (
+                        <div key={member.id} className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50">
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={member.photoURL || '/default-avatar.png'} />
+                                <AvatarFallback>{(member.displayName && member.displayName[0]) || (member.email && member.email[0]) || 'U'}</AvatarFallback>
+                              </Avatar>
+                              {member.isCreator && (
+                                <span className="absolute -bottom-1 -right-1">
+                                  <Crown className="h-3 w-3 text-amber-500" />
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{member.displayName}</p>
+                              <p className="text-xs text-muted-foreground">{member.email}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Kick member button (only shown to creator and not for self) */}
+                          {isGroupCreator() && member.id !== (currentUser.id || currentUser.uid) && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
+                              onClick={() => kickMember(member.id)}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+                
+                {/* Media Tab */}
+                <TabsContent value="media" className="mt-4">
+                  <ScrollArea className="h-[calc(100vh-300px)]">
+                    {fileAttachments.filter(f => f.type === 'image').length === 0 ? (
+                      <p className="text-sm text-center text-muted-foreground py-4">No images shared in this group yet</p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {fileAttachments
+                          .filter(f => f.type === 'image')
+                          .map((image, index) => (
+                            <div 
+                              key={index} 
+                              className="aspect-square relative rounded-md overflow-hidden cursor-pointer"
+                              onMouseEnter={() => setHoveredImageId(`image-${index}`)}
+                              onMouseLeave={() => setHoveredImageId(null)}
+                            >
+                              <img 
+                                src={image.url} 
+                                alt={image.name} 
+                                className="w-full h-full object-cover"
+                              />
+                              {hoveredImageId === `image-${index}` && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                  <a 
+                                    href={image.url} 
+                                    download={image.name}
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-white text-sm flex items-center gap-1 bg-primary/80 px-2 py-1 rounded-md"
+                                  >
+                                    <Image className="h-4 w-4" />
+                                    Download
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+                
+                {/* Files Tab */}
+                <TabsContent value="files" className="mt-4">
+                  <ScrollArea className="h-[calc(100vh-300px)]">
+                    {fileAttachments.filter(f => f.type === 'file' || f.type === 'voice').length === 0 ? (
+                      <p className="text-sm text-center text-muted-foreground py-4">No files shared in this group yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {fileAttachments
+                          .filter(f => f.type === 'file' || f.type === 'voice')
+                          .map((file, index) => (
+                            <div key={index} className="p-3 rounded-md bg-accent/30 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {file.type === 'voice' ? (
+                                  <Mic className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <File className="h-4 w-4 text-primary" />
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {file.size ? `${Math.round(file.size / 1024)} KB` : ''} • 
+                                    {file.timestamp?.toDate ? format(file.timestamp.toDate(), 'PP') : 'Unknown date'}
+                                  </p>
+                                </div>
+                              </div>
+                              <a 
+                                href={file.url} 
+                                download={file.name}
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-primary hover:text-primary/80"
+                              >
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <File className="h-4 w-4" />
+                                </Button>
+                              </a>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+              
+              <SheetFooter className="mt-auto">
+                <SheetClose asChild>
+                  <Button variant="outline" size="sm">Close</Button>
+                </SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+        
+        {/* Messages Area */}
+        <ScrollArea className="flex-1 p-3 overflow-auto">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full">
+              <p>Loading messages...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex justify-center items-center h-full text-muted-foreground">
+              <p>No messages yet. Start the conversation!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message) => {
+                // Determine if message is from current user for alignment
+                const isCurrentUserMessage = currentUser && 
+                  message.senderId === (currentUser.id || currentUser.uid);
+                
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.type === 'system' 
+                        ? 'justify-center' 
+                        : isCurrentUserMessage 
+                          ? 'justify-end' 
+                          : 'justify-start'
+                    }`}
+                  >
+                    {message.type === 'system' ? (
+                      <div className="bg-accent/20 text-muted-foreground rounded-md px-3 py-2 text-sm max-w-[80%] text-center italic">
+                        {message.content}
+                      </div>
+                    ) : message.type === 'image' ? (
+                      <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+                        {!isCurrentUserMessage && (
+                          <Avatar className="h-8 w-8 mr-2">
+                            <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
+                            <AvatarFallback>
+                              {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          {!isCurrentUserMessage && (
+                            <p className="text-xs font-medium mb-1">
+                              {getMemberName(message.senderId)}
+                            </p>
+                          )}
+                          <div className={`rounded-lg overflow-hidden max-w-[240px]`}>
+                            <a 
+                              href={message.fileURL} 
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img 
+                                src={message.fileURL} 
+                                alt="Shared image" 
+                                className="max-w-full h-auto rounded-lg"
+                              />
+                            </a>
+                            <div className="text-xs opacity-70 text-right mt-1 px-2">
+                              {formatMessageDate(message.timestamp)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : message.type === 'file' ? (
+                      <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+                        {!isCurrentUserMessage && (
+                          <Avatar className="h-8 w-8 mr-2">
+                            <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
+                            <AvatarFallback>
+                              {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          {!isCurrentUserMessage && (
+                            <p className="text-xs font-medium mb-1">
+                              {getMemberName(message.senderId)}
+                            </p>
+                          )}
+                          <div className={`${
+                            isCurrentUserMessage 
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-accent'
+                            } rounded-lg px-3 py-2 text-sm break-words`}
+                          >
+                            <a 
+                              href={message.fileURL} 
+                              download={message.fileName}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2"
+                            >
+                              <File className="h-4 w-4" />
+                              <span className="underline">{message.fileName}</span>
+                              <span className="text-xs">
+                                ({message.fileSize ? `${Math.round(message.fileSize / 1024)} KB` : 'Unknown size'})
+                              </span>
+                            </a>
+                            <div className="text-xs opacity-70 text-right mt-1">
+                              {formatMessageDate(message.timestamp)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : message.type === 'voice' ? (
+                      <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+                        {!isCurrentUserMessage && (
+                          <Avatar className="h-8 w-8 mr-2">
+                            <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
+                            <AvatarFallback>
+                              {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          {!isCurrentUserMessage && (
+                            <p className="text-xs font-medium mb-1">
+                              {getMemberName(message.senderId)}
+                            </p>
+                          )}
+                          <div className={`${
+                            isCurrentUserMessage 
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-accent'
+                            } rounded-lg p-2 text-sm`}
+                          >
+                            <AudioPlayer audioUrl={message.fileURL || ''} />
+                            <div className="text-xs opacity-70 text-right mt-1">
+                              {formatMessageDate(message.timestamp)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`flex ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+                        {!isCurrentUserMessage && (
+                          <Avatar className="h-8 w-8 mr-2">
+                            <AvatarImage src={groupMembers.find(m => m.id === message.senderId)?.photoURL || '/default-avatar.png'} />
+                            <AvatarFallback>
+                              {getMemberName(message.senderId || '')[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          {!isCurrentUserMessage && (
+                            <p className="text-xs font-medium mb-1">
+                              {getMemberName(message.senderId)}
+                            </p>
+                          )}
+                          <div className={`${
+                            isCurrentUserMessage 
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-accent'
+                            } rounded-lg px-3 py-2 text-sm break-words`}
+                          >
+                            {message.content}
+                            <span className="text-xs opacity-70 ml-2">
+                              {formatMessageDate(message.timestamp)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </ScrollArea>
+        
+        {/* Message Input */}
+        <form onSubmit={handleSendMessage} className="p-3 border-t flex flex-col space-y-2 shrink-0 bg-background">
+          {/* Upload progress */}
+          {isUploading && (
+            <div className="w-full bg-accent/30 rounded-full h-1.5 mb-1">
+              <div 
+                className="bg-primary h-1.5 rounded-full" 
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          )}
+          
+          <div className="flex items-center space-x-2">
+            <Input
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1"
+              disabled={isUploading}
+            />
+            
+            {/* Emoji Picker */}
+            <div className="relative">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full h-9 w-9"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                disabled={isUploading}
+              >
+                <Smile size={18} />
+              </Button>
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-full right-0 mb-2 z-10"
+                  >
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(emoji: any) => {
+                        setNewMessage(prev => prev + emoji.native);
+                        setShowEmojiPicker(false);
+                      }}
+                      previewPosition="none"
+                      skinTonePosition="none"
+                      theme={theme === 'dark' ? 'dark' : 'light'}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            {/* File attachment */}
+            <div className="relative">
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden" 
+                id="file-upload" 
+                disabled={isUploading}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-full h-9 w-9"
+                onClick={openCloudinaryWidget}
+                disabled={isUploading}
+              >
+                <Paperclip size={18} />
+              </Button>
+            </div>
+            
+            {/* Voice message */}
+            <VoiceRecorder onRecordingComplete={handleVoiceMessage} />
+            
+            <Button 
+              type="submit" 
+              disabled={!newMessage.trim() || isUploading}
+              size="icon" 
+              className="rounded-full h-9 w-9"
+            >
+              <Send size={16} />
+            </Button>
+          </div>
+        </form>
+      </div>
+      
+      {/* Group Call Dialog */}
+      {showCallDialog && currentUser && activeCall && (
+        <Dialog open={showCallDialog} onOpenChange={setShowCallDialog}>
+          <DialogContent className="sm:max-w-[85vw] md:max-w-[1000px] p-0 h-[85vh] max-h-[700px]">
+            <DialogTitle className="sr-only">
+              Group call in {groupName}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Video call with group members in {groupName}
+            </DialogDescription>
+            <GroupVideoCall
+              currentUserId={currentUser.id}
+              groupId={groupId}
+              groupName={groupName}
+              onEndCall={handleEndCall}
+              displayName={currentUser.displayName}
+              photoURL={currentUser.photoURL}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
