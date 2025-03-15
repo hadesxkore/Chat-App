@@ -1,6 +1,7 @@
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/components/theme-provider'
+import { VideoCallProvider } from '@/contexts/VideoCallContext'
 
 export default function RootLayout({
   children,
@@ -17,7 +18,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <VideoCallProvider>
+              {children}
+            </VideoCallProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,11 +32,8 @@ import FileUploader from "@/components/FileUploader";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormLabel } from "@/components/ui/label";
-import { GroupChatComponent } from "@/components/GroupChat";
-import GroupMessages from "@/components/GroupMessages";
-import IncomingCallAlert from '@/components/IncomingCallAlert';
-import VideoCallButton from '@/components/VideoCallButton';
-import VideoCall from '@/components/VideoCall';
+import GroupChatComponent from '@/components/GroupChat';
+import GroupMessages from '@/components/GroupMessages';
 
 interface User {
   id: string;
@@ -240,10 +237,9 @@ const VoiceRecorder = ({ onRecordingComplete }: { onRecordingComplete: (blob: Bl
       </Button>
       {isRecording && (
         <div className="absolute bottom-full left-0 mb-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1 shadow-md">
-          <span className="animate-pulse">●</span>
+          <span className="animate-pulse">â—</span>
           <span>{formatTime(recordingTime)}</span>
         </div>
-      )}
     </div>
   );
 };
@@ -508,7 +504,7 @@ export default function ChatPage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   
   // Generic reactions
-  const reactions = ['❤️', '👍', '😂', '😢', '😡', '🔥'];
+  const reactions = ['â¤ï¸', 'ðŸ‘', 'ðŸ˜‚', 'ðŸ˜¢', 'ðŸ˜¡', 'ðŸ”¥'];
   
   // Add Cloudinary widget reference
   const cloudinaryRef = useRef<any>();
@@ -1373,9 +1369,9 @@ export default function ChatPage() {
       // Create message content
       let messageContent = '';
       if (messageType === 'image') {
-        messageContent = '📷 Image';
+        messageContent = 'ðŸ“· Image';
       } else {
-        messageContent = `📎 ${fileName || 'File'}`;
+        messageContent = `ðŸ“Ž ${fileName || 'File'}`;
       }
       
       const chatId = [user.uid, selectedUser.id].sort().join('_');
@@ -1457,9 +1453,9 @@ export default function ChatPage() {
       // Create message content
       let messageContent = '';
       if (messageType === 'image') {
-        messageContent = '📷 Image';
+        messageContent = 'ðŸ“· Image';
       } else {
-        messageContent = `📎 ${fileName || 'File'}`;
+        messageContent = `ðŸ“Ž ${fileName || 'File'}`;
       }
       
       const chatId = [user.uid, selectedUser.id].sort().join('_');
@@ -1726,7 +1722,7 @@ export default function ChatPage() {
             chatId,
             senderId: user.uid,
             receiverId: selectedUser.id,
-            content: '🎤 Voice message',
+            content: 'ðŸŽ¤ Voice message',
             timestamp: serverTimestamp(),
             read: false,
             edited: false,
@@ -1745,7 +1741,7 @@ export default function ChatPage() {
           // Update chat document
           const chatRef = doc(db, 'chats', chatId);
           await updateDoc(chatRef, {
-            lastMessage: '🎤 Voice message',
+            lastMessage: 'ðŸŽ¤ Voice message',
             lastMessageTime: serverTimestamp(),
             lastSenderId: user.uid,
             [`unreadCount.${selectedUser.id}`]: increment(1)
@@ -1785,15 +1781,6 @@ export default function ChatPage() {
     setSelectedUser(null); // Deselect any one-on-one chat
   };
 
-  // Near the end of the main component, before the return statement
-  // Add the current user variables needed for the call components
-  const [activeView, setActiveView] = useState<'messages' | 'groups'>('messages');
-  const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
-  const [activeChatUser, setActiveChatUser] = useState<User | null>(null);
-
-  // Add this state variable with the other state declarations
-  const [showVideoCall, setShowVideoCall] = useState(false);
-
   return (
     <>
       <div className="flex h-screen bg-background">
@@ -1813,15 +1800,12 @@ export default function ChatPage() {
               <>
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
-              </>
             ) : (
               // Hamburger icon when sidebar is closed
               <>
                 <line x1="3" y1="12" x2="21" y2="12"></line>
                 <line x1="3" y1="6" x2="21" y2="6"></line>
                 <line x1="3" y1="18" x2="21" y2="18"></line>
-              </>
-            )}
           </svg>
         </button>
 
@@ -1881,7 +1865,6 @@ export default function ChatPage() {
                           <Sun size={20} />
                         ) : (
                           <Moon size={20} />
-                        )}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -1901,7 +1884,7 @@ export default function ChatPage() {
               <TabsContent value="chats">
                 <div className="relative">
                   <Input
-                    value={searchQuery}
+              value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="Search users..."
@@ -1911,23 +1894,16 @@ export default function ChatPage() {
                     variant="ghost"
                     size="icon"
                     className="absolute right-0 top-0 h-full"
-                    onClick={handleSearch}
-                  >
-                    <Search size={20} />
+              onClick={handleSearch}
+            >
+              <Search size={20} />
                   </Button>
                 </div>
               </TabsContent>
               <TabsContent value="groups">
                 <GroupChatComponent 
-                  currentUser={{
-                    id: user?.uid || '',
-                    email: user?.email || '',
-                    displayName: user?.displayName || '',
-                    photoURL: user?.photoURL || '',
-                    uid: user?.uid
-                  }}
+                  currentUser={user as unknown as User}
                   onSelect={handleSelectGroup}
-                  activeGroupId={selectedGroup?.id}
                 />
               </TabsContent>
               <TabsContent value="friends">
@@ -2029,7 +2005,6 @@ export default function ChatPage() {
                 </div>
               </ScrollArea>
             </div>
-          )}
 
           {/* Recent Chats / Search Results */}
           <ScrollArea className="flex-1">
@@ -2110,7 +2085,6 @@ export default function ChatPage() {
                             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
                               {chatNotifications[chat.id].unreadCount}
                             </span>
-                          )}
                         </div>
                         <div className="flex flex-col flex-1 min-w-0">
                           <div className="flex items-center justify-between">
@@ -2126,9 +2100,7 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
-                )}
               </div>
-            )}
           </ScrollArea>
 
           {/* Logout Button */}
@@ -2144,8 +2116,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-        {/* Main Chat Area - Make it responsive */}
-        <div className="flex-1 flex flex-col w-full">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {selectedUser ? (
             <>
               {/* Chat Header - Make it responsive */}
@@ -2181,29 +2153,11 @@ export default function ChatPage() {
                     <span className="text-xs text-muted-foreground">
                       {selectedUser.status === 'online' ? 'Online' : 'Offline'}
                     </span>
-              </div>
-            </div>
+                  </div>
+                </div>
 
                 {/* Chat options */}
                 <div className="flex items-center space-x-2">
-                  {/* Add Video Call Button */}
-                  {user && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full"
-                      onClick={() => {
-                        if (selectedUser && user) {
-                          // Handle video call button click manually
-                          // Open dialog or redirect to video call page
-                          setShowVideoCall(true);
-                        }
-                      }}
-                    >
-                      <Video className="h-5 w-5" />
-                    </Button>
-                  )}
-
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2212,6 +2166,63 @@ export default function ChatPage() {
                   >
                     <MoreVertical size={20} />
                   </Button>
+
+                  <AnimatePresence>
+                    {showChatOptions && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-4 top-16 bg-card border border-border rounded-lg shadow-lg p-2 z-50"
+                      >
+                        <div className="space-y-1">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setShowUserProfile(true);
+                              setShowChatOptions(false);
+                            }}
+                          >
+                            <UserPlus size={16} className="mr-2" />
+                            View Profile
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setShowEditNickname(true);
+                              setShowChatOptions(false);
+                            }}
+                          >
+                            <Edit size={16} className="mr-2" />
+                            Edit Nickname
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setShowFilesPhotosSheet(true);
+                              setShowChatOptions(false);
+                            }}
+                          >
+                            <Image size={16} className="mr-2" />
+                            Files & Photos
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-destructive"
+                            onClick={() => {
+                              handleBlockUser(selectedUser.id);
+                              setShowChatOptions(false);
+                            }}
+                          >
+                            <X size={16} className="mr-2" />
+                            {blockedUsers.includes(selectedUser.id) ? 'Unblock User' : 'Block User'}
+                          </Button>
+                        </div>
+                      </motion.div>
+                  </AnimatePresence>
                 </div>
               </div>
               
@@ -2237,7 +2248,6 @@ export default function ChatPage() {
                         <p className="text-center">No messages yet.</p>
                         <p className="text-sm">Say hello to start the conversation!</p>
                       </div>
-                    )}
                   </div>
                 ) : (
                   <>
@@ -2355,16 +2365,11 @@ export default function ChatPage() {
                                         <div className="text-xs text-muted-foreground">
                                           Voice message unavailable
                                         </div>
-                                      )}
                                     </div>
                                   ) : (
                                     <span>{message.content}</span>
-                                  )}
                                   {message.edited && (
                                     <span className="text-xs ml-1 opacity-70">(edited)</span>
-                                  )}
-                                </>
-                              )}
                             </div>
                             
                             {/* Message Actions */}
@@ -2394,7 +2399,6 @@ export default function ChatPage() {
                                     <Trash size={12} />
                                   </Button>
                                   </div>
-                                )}
                             </div>
 
                             {/* Reactions */}
@@ -2440,11 +2444,8 @@ export default function ChatPage() {
                               </div>
                             </div>
                           </motion.div>
-                        )}
                         {/* This empty div serves as a marker for scrolling to the bottom */}
                         <div ref={messagesEndRef} style={{ height: '1px', width: '100%' }} />
-                      </>
-                    )}
                 </div>
 
               {/* Message Input - Make it responsive */}
@@ -2498,7 +2499,6 @@ export default function ChatPage() {
                                   />
                                 </div>
                               </motion.div>
-                            )}
                           </AnimatePresence>
                         </div>
                         
@@ -2547,7 +2547,6 @@ export default function ChatPage() {
                                   theme={theme}
                                 />
                               </motion.div>
-                            )}
                           </AnimatePresence>
                         </div>
 
@@ -2562,9 +2561,7 @@ export default function ChatPage() {
                       </div>
                     </form>
                   )
-                )}
             </div>
-          </>
         ) : selectedGroup ? (
           <GroupMessages 
             groupId={selectedGroup.id}
@@ -2573,80 +2570,16 @@ export default function ChatPage() {
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-4 text-center space-y-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="max-w-md w-full text-center px-4"
-            >
-              <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">
-                Welcome to Chat App
-              </h2>
-              <p className="mb-8 text-lg">
-                Connect with friends and start meaningful conversations.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-6">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="p-6 border border-border rounded-xl bg-card/50 backdrop-blur-sm hover:border-primary transition-colors"
-                >
-                  <div className="flex flex-col items-center space-y-3">
-                    <div className="p-3 rounded-full bg-primary/10">
-                      <UserPlus size={24} className="text-primary" />
-                    </div>
-                    <h3 className="font-medium">Find Friends</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Search for users by email to connect with them
-                    </p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="p-6 border border-border rounded-xl bg-card/50 backdrop-blur-sm hover:border-primary transition-colors"
-                >
-                  <div className="flex flex-col items-center space-y-3">
-                    <div className="p-3 rounded-full bg-primary/10">
-                      <MessageSquare size={24} className="text-primary" />
-                    </div>
-                    <h3 className="font-medium">Recent Chats</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Your conversations will appear in the sidebar
-                    </p>
-                  </div>
-                </motion.div>
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="mt-12 p-6 border border-border rounded-xl bg-card/30"
-              >
-                <h3 className="font-medium mb-2">Getting Started</h3>
-                <ol className="text-sm text-left space-y-2">
-                  <li className="flex items-center space-x-2">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">1</span>
-                    <span>Search for users by their email address</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">2</span>
-                    <span>Send friend requests to connect</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">3</span>
-                    <span>Start chatting with your friends</span>
-                  </li>
-                </ol>
-              </motion.div>
-            </motion.div>
+            <div className="rounded-full bg-primary/10 p-6">
+              <MessageSquare className="h-12 w-12 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold">Welcome to Chat App</h2>
+            <p className="text-muted-foreground max-w-md">
+              Select a chat to start messaging or search for users to start a new conversation.
+              You can also create or join group chats from the Groups tab.
+            </p>
           </div>
-        )}
       </div>
-    </div>
 
       {/* Profile Dialog */}
       {profileDialogOpen && (
@@ -2696,7 +2629,6 @@ export default function ChatPage() {
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
                   <span>Uploading profile picture...</span>
                                   </div>
-                                )}
             </div>
             
             <div className="space-y-4">
@@ -2749,7 +2681,6 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      )}
 
       {/* User Profile Dialog */}
       {showUserProfile && selectedUser && (
@@ -2779,14 +2710,12 @@ export default function ChatPage() {
                   </span>
                 ) : (
                   selectedUser?.displayName || 'User'
-                )}
               </h3>
               <p className="text-muted-foreground">{selectedUser?.email || ''}</p>
               {selectedUser?.bio && (
                 <div className="mt-4 p-3 bg-accent/30 rounded-lg text-center max-w-xs">
                   <p className="italic">{selectedUser.bio}</p>
                 </div>
-              )}
             </div>
             
             <div className="space-y-3 mb-6">
@@ -2807,7 +2736,6 @@ export default function ChatPage() {
                       : new Date(selectedUser.lastSeen).toLocaleString()}
                   </span>
                 </div>
-              )}
             </div>
             
             <div className="space-y-2">
@@ -2834,13 +2762,10 @@ export default function ChatPage() {
                   <>
                     <Check size={16} className="mr-2" />
                     Unblock User
-                  </>
                 ) : (
                   <>
                     <X size={16} className="mr-2" />
                     Block User
-                  </>
-                )}
               </Button>
             </div>
             
@@ -2853,7 +2778,6 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      )}
 
       {/* Add Nickname Dialog */}
       {showEditNickname && selectedUser && (
@@ -2930,7 +2854,6 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      )}
       
       <Toaster richColors position="top-center" />
 
@@ -2983,7 +2906,7 @@ export default function ChatPage() {
                                 <p className="font-medium truncate">{fileMsg.fileName || 'File'}</p>
                                 <div className="flex items-center text-xs text-muted-foreground">
                                   <span>{new Date(fileMsg.timestamp).toLocaleDateString()}</span>
-                                  <span className="mx-2">•</span>
+                                  <span className="mx-2">â€¢</span>
                                   <span>{fileMsg.fileSize ? `${Math.round(fileMsg.fileSize / 1024)} KB` : 'Unknown size'}</span>
                                 </div>
                               </div>
@@ -3002,7 +2925,6 @@ export default function ChatPage() {
                           ))}
                                     </div>
                     </ScrollArea>
-                  )}
                 </TabsContent>
                 
                 <TabsContent value="photos" className="h-full data-[state=active]:flex data-[state=active]:flex-col">
@@ -3065,13 +2987,11 @@ export default function ChatPage() {
                           ))}
                       </div>
                     </ScrollArea>
-                  )}
                 </TabsContent>
               </div>
             </Tabs>
                                     </div>
                                   </div>
-                                )}
 
       {/* Image Preview Modal - Make it responsive */}
       {imagePreviewUrl && (
@@ -3109,7 +3029,6 @@ export default function ChatPage() {
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
               </Button>
-            )}
             
             {/* Image */}
             <img 
@@ -3138,14 +3057,12 @@ export default function ChatPage() {
                   <path d="M9 18l6-6-6-6" />
                 </svg>
               </Button>
-            )}
             
             {/* Image counter indicator */}
             {imageMessages.length > 1 && (
               <div className="absolute bottom-14 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-1 rounded-full text-sm">
                 {currentImageIndex + 1} / {imageMessages.length}
               </div>
-            )}
             
             {/* Download button */}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
@@ -3163,28 +3080,5 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Video Call Dialog */}
-      {user && selectedUser && (
-        <Dialog open={showVideoCall} onOpenChange={setShowVideoCall}>
-          <DialogContent className="sm:max-w-[900px] p-0 h-[80vh] max-h-[600px]">
-            <DialogTitle className="sr-only">
-              Video call with {getDisplayName(selectedUser.id)}
-            </DialogTitle>
-            <DialogDescription className="sr-only">
-              One-on-one video call with {getDisplayName(selectedUser.id)}
-            </DialogDescription>
-            <VideoCall
-              currentUserId={user.uid}
-              targetUserId={selectedUser.id}
-              onEndCall={() => setShowVideoCall(false)}
-              displayName={user.displayName || 'You'}
-              photoURL={userProfile?.photoURL || user.photoURL || undefined}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-    </>
   );
 }
